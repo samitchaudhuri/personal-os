@@ -126,3 +126,28 @@ This work is licensed under CC BY-NC-SA 4.0.
 Copyright © 2025 Aman Khan. You may view, use, modify, and share this repo with attribution for non-commercial purposes. Commercial sale is not permitted, but you may use it internally for work and business.
 
 Full license: https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+
+## Attribution & Licensing
+
+This project is based on and incorporates material from:
+
+**Original Project:** [Original Project Name]  
+**Source:** https://github.com/amanaiproduct/personal-os
+**License:** Creative Commons Attribution–NonCommercial–ShareAlike 4.0  
+(CC BY-NC-SA 4.0) – https://creativecommons.org/licenses/by-nc-sa/4.0/
+
+### Required Attribution
+The original work by **ORIGINAL AUTHOR(S)** has been modified for use in this project.
+Modifications include (but may not be limited to): code changes, structural adaptations,
+added features, and custom documentation.
+
+### License for This Derivative Work
+Because the original is licensed under **CC BY-NC-SA 4.0**, this derivative project is also
+distributed under the **same license**.  
+You may:
+- Share and adapt this project  
+- For **non-commercial purposes only**  
+- As long as you provide proper attribution and  
+- License any derivatives under the **same CC BY-NC-SA 4.0 license**
+
+© [Your Name or Organization], [Year].
