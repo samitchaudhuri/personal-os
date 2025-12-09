@@ -16,7 +16,7 @@ When the user says "clear my backlog", "process backlog", or similar:
 1. Read `BACKLOG.md` and extract every actionable item.
 2. Look through `Knowledge/` for context (matching keywords, project names, or dates).
 3. Use `process_backlog_with_dedup` to avoid creating duplicates.
-4. Ask only the questions necessary to resolve ambiguity.
+4. If an item lacks context, priority, or a clear next step, STOP and ask the user for clarification before creating the task.
 5. Create or update task files under `Tasks/` with complete metadata.
 6. Present a concise summary of new tasks, then clear `BACKLOG.md`.
 
@@ -63,9 +63,26 @@ Tie to goals and reference material.
 - **outreach**: communicate, meet
 - **research**: learn, analyze
 - **writing**: draft, document
+- **content**: blog posts, social media, public writing
 - **admin**: operations, finance, logistics
 - **personal**: health, routines
 - **other**: everything else
+
+## Specialized Workflows
+
+For complex tasks, delegate to workflow files in `examples/workflows/`. Read the workflow file and follow its instructions.
+
+| Trigger | Workflow File | When to Use |
+|---------|---------------|-------------|
+| Content generation, writing in user's voice | `examples/workflows/content-generation.md` | Any writing, marketing, or content task |
+| Morning planning | `examples/workflows/morning-standup.md` | "What should I work on today?" |
+| Processing backlog | `examples/workflows/backlog-processing.md` | Reference for backlog flow |
+| Weekly reflection | `examples/workflows/weekly-review.md` | Weekly review prompts |
+
+**How to use workflows:**
+1. When a task matches a trigger, read the corresponding workflow file
+2. Follow the workflow's step-by-step instructions
+3. The workflow may reference files in `Knowledge/` for context (e.g., voice samples)
 
 ## Helpful Prompts to Encourage
 - "Clear my backlog"
