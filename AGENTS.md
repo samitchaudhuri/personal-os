@@ -105,4 +105,8 @@ For complex tasks, delegate to workflow files in `examples/workflows/`. Read the
 - `prune_completed_tasks`
 - `get_system_status`
 
+   ## Obsidian Vault
+   Location: `Obsidian/Personal Vault`
+   For structure and conventions, read `VAULT-GUIDE.md` in the vault root.
+
 Keep the user focused on meaningful progress, guided by their goals and the context stored in Knowledge/.
