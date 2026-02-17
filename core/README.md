@@ -136,6 +136,16 @@ The system automatically:
 4. **Prune completed tasks** - Auto-cleanup after 30 days
 5. **Link related items** - Connect tasks to CRM contacts
 
+## Integrations
+
+Optional integrations extend Personal OS with external tools:
+
+| Integration | Description | Setup |
+|-------------|-------------|-------|
+| [Granola](./integrations/granola/) | Sync meeting notes and transcripts | `Set up Granola integration` |
+
+See [integrations/](./integrations/) for full documentation.
+
 ## Customization
 
 The system is designed to be extended:
@@ -143,7 +153,7 @@ The system is designed to be extended:
 - **Categories**: Add your own in config.yaml
 - **Priorities**: Define what's urgent for you
 - **Workflows**: Modify AGENTS.md instructions
-- **Integrations**: Extend MCP server with new tools
+- **Integrations**: Add external tools via [integrations/](./integrations/)
 
 ## Example Workflow
 

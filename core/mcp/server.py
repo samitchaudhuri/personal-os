@@ -4,12 +4,17 @@ MCP Server for Manager AI - TODO System Management
 """
 
 import os
+import sys
 import json
 import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Any
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from collections import Counter
+
+# Add scripts directory to path for trace parser
+SCRIPTS_DIR = Path(__file__).parent.parent / "scripts"
+sys.path.insert(0, str(SCRIPTS_DIR))
 
 import yaml
 import re
@@ -23,12 +28,22 @@ import mcp.types as types
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Custom JSON encoder for handling date/datetime objects
+class DateTimeEncoder(json.JSONEncoder):
+    """JSON encoder that handles date and datetime objects"""
+    def default(self, obj):
+        if isinstance(obj, (datetime, date)):
+            return obj.isoformat()
+        return super().default(obj)
+
 # Configuration - use environment variable or current directory
 BASE_DIR = Path(os.environ.get('MANAGER_AI_BASE_DIR', Path.cwd()))
 TASKS_DIR = BASE_DIR / 'Tasks'
+EVALS_DIR = BASE_DIR / 'core' / 'evals'
 
 # Ensure directories exist
 TASKS_DIR.mkdir(exist_ok=True, parents=True)
+EVALS_DIR.mkdir(exist_ok=True, parents=True)
 
 # Duplicate detection configuration
 DEDUP_CONFIG = {
@@ -458,6 +473,46 @@ async def handle_list_tools() -> list[types.Tool]:
                 },
                 "required": ["items"]
             }
+        ),
+        # Session Eval Tools
+        types.Tool(
+            name="list_evals",
+            description="List session evaluation files",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "judgement": {"type": "string", "description": "Filter by judgement (pending,success,partial,failure)"},
+                    "limit": {"type": "integer", "description": "Max evals to return", "default": 20}
+                }
+            }
+        ),
+        types.Tool(
+            name="generate_eval",
+            description="Generate eval from a Claude Code session",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "session_id": {"type": "string", "description": "Session ID or 'recent'"}
+                }
+            }
+        ),
+        types.Tool(
+            name="annotate_eval",
+            description="Add judgement and notes to an eval",
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "eval_file": {"type": "string", "description": "Eval filename"},
+                    "judgement": {"type": "string", "description": "Judgement (success,partial,failure)"},
+                    "annotation": {"type": "string", "description": "Notes"}
+                },
+                "required": ["eval_file"]
+            }
+        ),
+        types.Tool(
+            name="get_eval_summary",
+            description="Get summary of all evals",
+            inputSchema={"type": "object", "properties": {}}
         )
     ]
 
@@ -495,7 +550,7 @@ async def handle_call_tool(
             "count": len(tasks),
             "filters_applied": arguments or {}
         }
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
     elif name == "create_task":
         title = arguments['title']
@@ -536,7 +591,7 @@ async def handle_call_tool(
                 "error": str(e)
             }
         
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
     elif name == "update_task_status":
         task_file = arguments['task_file']
@@ -560,7 +615,7 @@ async def handle_call_tool(
                 "new_status": status_names.get(status, status)
             }
         
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
     elif name == "get_task_summary":
         tasks = get_all_tasks()
@@ -589,7 +644,7 @@ async def handle_call_tool(
             "time_by_priority": time_by_priority
         }
         
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
     elif name == "check_priority_limits":
         tasks = [t for t in get_all_tasks() if t.get('status') != 'd']
@@ -609,7 +664,7 @@ async def handle_call_tool(
             "balanced": len(alerts) == 0
         }
         
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
 
     elif name == "get_system_status":
         all_tasks = get_all_tasks()
@@ -651,7 +706,7 @@ async def handle_call_tool(
             "timestamp": now.isoformat()
         }
         
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
     elif name == "process_backlog":
         backlog_file = BASE_DIR / 'BACKLOG.md'
@@ -699,7 +754,7 @@ async def handle_call_tool(
                     "count": len(items)
                 }
         
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
     elif name == "clear_backlog":
         backlog_file = BASE_DIR / 'BACKLOG.md'
@@ -718,7 +773,7 @@ async def handle_call_tool(
                 "error": str(e)
             }
         
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
     elif name == "prune_completed_tasks":
         days = arguments.get('days', 30) if arguments else 30
@@ -745,7 +800,7 @@ async def handle_call_tool(
             "message": f"Deleted {len(deleted)} tasks older than {days} days"
         }
         
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
     
     elif name == "process_backlog_with_dedup":
         items = arguments.get('items', [])
@@ -754,7 +809,7 @@ async def handle_call_tool(
         if not items:
             return [types.TextContent(type="text", text=json.dumps({
                 "error": "No items provided to process"
-            }, indent=2))]
+            }, indent=2, cls=DateTimeEncoder))]
 
         existing_tasks = get_all_tasks()
 
@@ -847,8 +902,112 @@ async def handle_call_tool(
                 f"Ready to create {len(result['new_tasks'])} new tasks - use auto_create=true or create manually"
             )
         
-        return [types.TextContent(type="text", text=json.dumps(result, indent=2))]
-    
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
+
+    elif name == "list_evals":
+        limit = arguments.get('limit', 20) if arguments else 20
+        judgement_filter = arguments.get('judgement') if arguments else None
+
+        evals = []
+        for eval_file in sorted(EVALS_DIR.glob('*.md'), reverse=True):
+            if eval_file.name.startswith('_') or eval_file.name == 'README.md':
+                continue
+            try:
+                content = eval_file.read_text()
+                metadata, _ = parse_yaml_frontmatter(content)
+                if judgement_filter and metadata.get('judgement') != judgement_filter:
+                    continue
+                timestamp = metadata.get('timestamp', '')
+                if hasattr(timestamp, 'isoformat'):
+                    timestamp = timestamp.isoformat()
+                evals.append({
+                    'filename': eval_file.name,
+                    'session_id': metadata.get('session_id', ''),
+                    'timestamp': str(timestamp),
+                    'judgement': metadata.get('judgement', 'pending'),
+                    'axial_codes': metadata.get('axial_codes', [])
+                })
+                if len(evals) >= limit:
+                    break
+            except Exception as e:
+                logger.error(f"Error reading eval {eval_file}: {e}")
+
+        result = {"evals": evals, "count": len(evals)}
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
+
+    elif name == "generate_eval":
+        try:
+            from trace_parser import TraceParser
+            from trace_to_eval import EvalGenerator
+
+            parser = TraceParser()
+            generator = EvalGenerator(EVALS_DIR)
+            session_id = arguments.get('session_id', 'recent') if arguments else 'recent'
+
+            sessions = parser.list_sessions()
+            if not sessions:
+                result = {"success": False, "error": "No sessions found"}
+            elif session_id == 'recent':
+                session = parser.parse_session(sessions[0]['file_path'])
+                output_path = generator.generate_eval(session)
+                result = {"success": True, "eval_file": output_path.name, "session_id": session.session_id}
+            else:
+                matching = [s for s in sessions if s['session_id'].startswith(session_id)]
+                if not matching:
+                    result = {"success": False, "error": f"Session not found: {session_id}"}
+                else:
+                    session = parser.parse_session(matching[0]['file_path'])
+                    output_path = generator.generate_eval(session)
+                    result = {"success": True, "eval_file": output_path.name, "session_id": session.session_id}
+        except ImportError as e:
+            result = {"success": False, "error": f"Trace parser not available: {e}"}
+        except Exception as e:
+            result = {"success": False, "error": str(e)}
+
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
+
+    elif name == "annotate_eval":
+        eval_file = arguments['eval_file']
+        if not eval_file.endswith('.md'):
+            eval_file += '.md'
+
+        filepath = EVALS_DIR / eval_file
+        if not filepath.exists():
+            result = {"success": False, "error": f"Eval not found: {eval_file}"}
+        else:
+            updates = {'reviewed': True}
+            if arguments.get('judgement'):
+                updates['judgement'] = arguments['judgement']
+            if arguments.get('annotation'):
+                updates['annotation'] = arguments['annotation']
+
+            success = update_file_frontmatter(filepath, updates)
+            result = {"success": success, "eval_file": eval_file, "updates": updates}
+
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
+
+    elif name == "get_eval_summary":
+        judgement_counts = Counter()
+        total = 0
+
+        for eval_file in EVALS_DIR.glob('*.md'):
+            if eval_file.name.startswith('_') or eval_file.name == 'README.md':
+                continue
+            try:
+                content = eval_file.read_text()
+                metadata, _ = parse_yaml_frontmatter(content)
+                total += 1
+                judgement_counts[metadata.get('judgement', 'pending')] += 1
+            except:
+                pass
+
+        result = {
+            "total_evals": total,
+            "by_judgement": dict(judgement_counts),
+            "pending_review": judgement_counts.get('pending', 0)
+        }
+        return [types.TextContent(type="text", text=json.dumps(result, indent=2, cls=DateTimeEncoder))]
+
     else:
         return [types.TextContent(
             type="text",

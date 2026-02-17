@@ -2,6 +2,50 @@
 
 # Personal OS Setup Script
 # Creates directories, copies templates, and guides you through goals creation
+#
+# ┌─────────────────────────────────────────────────────────────────────┐
+# │ AGENT INSTRUCTIONS                                                  │
+# │                                                                     │
+# │ If you are an AI agent (e.g. Claude Code) reading this file:        │
+# │ Do NOT execute this script as bash. Instead, walk through the       │
+# │ setup interactively using your tools. Use AskUserQuestion (or your  │
+# │ equivalent interactive tool) to gather answers from the user.       │
+# │                                                                     │
+# │ Follow these steps:                                                 │
+# │                                                                     │
+# │ 1. CREATE WORKSPACE STRUCTURE                                       │
+# │    - Ensure these directories exist: Tasks/, Knowledge/             │
+# │    - If AGENTS.md doesn't exist, copy from core/templates/AGENTS.md │
+# │    - If .gitignore doesn't exist, copy from core/templates/gitignore│
+# │    - If BACKLOG.md doesn't exist, create it with a short intro      │
+# │                                                                     │
+# │ 2. ASK THE USER THESE 5 QUESTIONS (use AskUserQuestion if you      │
+# │    have it, otherwise ask inline):                                  │
+# │    Q1: "What's your current role?"                                  │
+# │        Example: Product Manager, Senior Engineer, Founder, VP       │
+# │    Q2: "What's your primary professional vision?                    │
+# │         What are you building toward?"                              │
+# │        Example: Become VP Product, Launch a successful product      │
+# │    Q3: "In 12 months, what would make you think                     │
+# │         'this was a successful year'?"                              │
+# │        Example: Shipped 3 major features, Built a team of 10       │
+# │    Q4: "What are your objectives for THIS QUARTER (next 90 days)?" │
+# │        Example: Launch new feature, Improve activation by 20%      │
+# │    Q5: "What are your top 3 priorities right now?                   │
+# │         (Be brutally honest)"                                       │
+# │        Example: 1. Ship Q1 roadmap, 2. Build thought leadership    │
+# │                                                                     │
+# │ 3. GENERATE GOALS.md                                                │
+# │    Use the answers to populate GOALS.md following the template      │
+# │    defined at the bottom of this script (search for "cat > GOALS") │
+# │                                                                     │
+# │ 4. SUMMARIZE                                                        │
+# │    Tell the user what was created and suggest next steps:           │
+# │    - Review GOALS.md and refine as needed                           │
+# │    - Read AGENTS.md to understand how the AI agent works            │
+# │    - Start adding tasks or notes to BACKLOG.md                      │
+# │    - Say "process my backlog" to begin triage                       │
+# └─────────────────────────────────────────────────────────────────────┘
 
 set -e
 

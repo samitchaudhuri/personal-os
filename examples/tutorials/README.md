@@ -7,6 +7,7 @@ Deep dives into AI agent concepts and how they power PersonalOS.
 | Tutorial | What You'll Learn |
 |----------|-------------------|
 | [Build Your Personal OS](build-your-personal-os.md) | Complete guide to building your AI-powered productivity system |
+| [Markdown & Structure](markdown-and-structure.md) | Why text and folders are the best database for AI |
 
 ## Core Concepts
 
@@ -15,6 +16,8 @@ Deep dives into AI agent concepts and how they power PersonalOS.
 | [Memory & Context](memory.md) | How your agent remembers across sessions |
 | [Subagents](subagents.md) | Running multiple agent instances for parallel work |
 | [Tool Calling & MCP](tool-calling.md) | How agents use tools and the MCP server |
+| [Understanding MCP](mcp-server-implementation.md) | Conceptual guide: Why use MCP? (For PMs) |
+| [Session Evals](session-evals.md) | Review and learn from your AI sessions |
 | [Voice Training](voice-training.md) | Make your agent write in your voice |
 
 ## Prerequisites
