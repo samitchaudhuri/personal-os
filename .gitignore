@@ -1,5 +1,9 @@
-# Template .gitignore for Task Management System
-# Copy relevant parts to your .gitignore
+# Personal OS .gitignore
+# Workspace root for AI-powered productivity system
+
+# Symlinked folders (external content)
+vault/                 # Obsidian vault on Google Drive
+projects/              # Code projects (each has own git repo)
 
 # Personal task files
 Tasks/*.md
