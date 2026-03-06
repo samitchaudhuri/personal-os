@@ -81,14 +81,10 @@ This setup connects directly to an Obsidian vault, which serves as the source of
 
 ```
 personal-os/
-<<<<<<< HEAD
 ├── vault/                  # Symlink to Obsidian vault on Google Drive/
 ├── AGENTS.md               # AI agent instructions (symlinks inside vault)
 ├── Knowledge/              # Legacy - prefer Obsidian Notes/
 ├── core/                   # Reusable system components (public)
-=======
-├── core/                    # Reusable system components (public)
->>>>>>> cb3dfd88fa3a6c25c96bd514e0002e93fa8b0a13
 │   ├── evals/              # Session evaluations
 │   ├── mcp/                # MCP server implementation
 │   │   └── server.py       # Core server with deduplication
