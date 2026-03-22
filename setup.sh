@@ -313,6 +313,30 @@ EOF
 
 print_success "Created: GOALS.md"
 
+# Optional: Install skill packs
+print_header "Optional: Install Skill Packs"
+
+echo "Skill packs add extra capabilities to your Personal OS."
+echo ""
+echo "Available packs:"
+echo "  - amans-skills: Excalidraw diagrams, design-for-agents, and more"
+echo "    https://github.com/amanaiproduct/amans-skills"
+echo ""
+
+read -p "Install amans-skills pack? (y/N) " install_skills
+if [[ "$install_skills" =~ ^[Yy]$ ]]; then
+    if command -v git &> /dev/null; then
+        git clone https://github.com/amanaiproduct/amans-skills.git "$HOME/amans-skills" 2>/dev/null && \
+            print_success "Cloned amans-skills to ~/amans-skills" && \
+            print_info "Run 'cat ~/amans-skills/SETUP.md' for installation instructions" || \
+            print_warning "Failed to clone amans-skills. You can install manually later."
+    else
+        print_warning "git not found. Install manually: https://github.com/amanaiproduct/amans-skills"
+    fi
+else
+    print_info "Skipped. You can install later: https://github.com/amanaiproduct/amans-skills"
+fi
+
 # Final summary
 print_header "Setup Complete!"
 
