@@ -1,1 +1,1 @@
-/Users/samit/Google Drive/Obsidian/Personal Vault/Agent Config/AGENTS.md
+/Users/samit/Google Drive/Obsidian/Samit Personal Vault/Agent Config/AGENTS.md

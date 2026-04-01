@@ -49,6 +49,8 @@ env/
 # Tool-specific
 .specstory/
 .factory/
+.claude/settings.local.json
+.agent
 
 # Logs
 *.log
