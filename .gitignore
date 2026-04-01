@@ -50,6 +50,7 @@ env/
 .specstory/
 .factory/
 .claude/settings.local.json
+.claude/agents
 .agent
 
 # Logs
