@@ -37,8 +37,13 @@ venv/
 env/
 .env
 
+# Presentations build artifacts
+presentations/build/
+*.generated.md
+
 # IDE & Editor configs
 .vscode/
+!.vscode/tasks.json
 .idea/
 .obsidian/
 *.swp

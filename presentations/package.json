@@ -1,0 +1,9 @@
+{
+  "name": "mermaid-slide-build",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "build-mermaid": "node tools/inject-mermaid-theme.js",
+    "rename-svgs": "node tools/rename-mermaid-svgs.js"
+  }
+}
