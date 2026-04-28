@@ -42,8 +42,20 @@ presentations/build/
 *.generated.md
 
 # IDE & Editor configs
-.vscode/
+.vscode/*
+!.vscode/settings.json
 !.vscode/tasks.json
+!.vscode/extensions.json
+
+# Optional: if you ever create local-only overrides
+.vscode/settings.local.json
+
+.cursor/*
+!.cursor/rules/
+
+# If rules should also be selective:
+# !.cursor/rules/*.mdc
+
 .idea/
 .obsidian/
 *.swp
