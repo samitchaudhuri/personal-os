@@ -1,0 +1,26 @@
+{
+    // -------------------------------------------------------
+    // Project behavior (shared across Cursor + VSCode)
+    // -------------------------------------------------------
+  
+    "markdown-preview-enhanced.previewTheme": "atom-dark.css",
+  
+    "mermaidExportPro.defaultFormat": "svg",
+    "mermaidExportPro.outputDirectory": "../../vault/Attachments",
+    "mermaidExportPro.batchExportMode": "automatic",
+    "mermaidExportPro.autoNaming.mode": "overwrite",
+    "mermaidExportPro.organizeByFormat": false,
+  
+    "markdown.marp.exportAutoOpen": false,
+    "markdown.marp.pdf.noteAnnotations": true,
+  
+    "workbench.editor.enablePreview": false,
+    "workbench.editor.revealIfOpen": true,
+  
+    // -------------------------------------------------------
+    // Cursor-specific but harmless to share
+    // -------------------------------------------------------
+  
+    "claudeCode.useTerminal": false,
+    "claudeCode.preferredLocation": "panel"
+  }

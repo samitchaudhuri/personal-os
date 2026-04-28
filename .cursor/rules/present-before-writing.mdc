@@ -1,0 +1,10 @@
+---
+description: Cursor loads this file; agent policy lives in AGENTS.md
+alwaysApply: true
+---
+
+# Agent instructions
+
+**Canonical source:** repository root **`AGENTS.md`**. Follow it in full (writing, vault behavior, workflows, and **Present before writing**).
+
+This `.mdc` file does not duplicate that content so the same rules apply in Cursor, Claude Code, and other tools that read `AGENTS.md`.

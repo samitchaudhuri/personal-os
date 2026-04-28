@@ -1,71 +1,105 @@
-const fs = require('fs');
-const path = require('path');
+#!/usr/bin/env node
 
-const DEFAULT_IMAGES_DIR = "/Users/samit/Google Drive/Obsidian/Samit Personal Vault/Attachments";
+const fs = require("fs");
+const path = require("path");
 
-const [, , sourceMdPath, exportedFromMdPathArg, imagesDirArg] = process.argv;
-
-if (!sourceMdPath) {
-  console.error("Usage: node tools/rename-mermaid-svgs.js <source.md> [exported-from.md] [images-dir]");
+function fail(message) {
+  console.error(`Error: ${message}`);
   process.exit(1);
 }
 
-const exportedFromMdPath = exportedFromMdPathArg || sourceMdPath;
-const imagesDir = imagesDirArg || DEFAULT_IMAGES_DIR;
+const [, , sourceMdPathArg, imagesDirArg] = process.argv;
+
+if (!sourceMdPathArg || !imagesDirArg) {
+  fail(
+    'Usage: node presentations/tools/rename-mermaid-svgs.js "<source.mermaid.md>" "<images-dir>"'
+  );
+}
+
+const sourceMdPath = path.resolve(process.cwd(), sourceMdPathArg);
+const imagesDir = path.resolve(process.cwd(), imagesDirArg);
+
+const prefixArg = process.argv[4];
+if (!prefixArg) {
+  fail("Expected prefix argument (e.g. mmdc)");
+}
+
+const prefixRegex = new RegExp(`^${prefixArg}-\\d+\\.svg$`, "i");
 
 if (!fs.existsSync(sourceMdPath)) {
-  console.error(`Source markdown not found: ${sourceMdPath}`);
-  process.exit(1);
+  fail(`Source markdown not found: ${sourceMdPath}`);
 }
 
 if (!fs.existsSync(imagesDir)) {
-  console.error(`Images directory not found: ${imagesDir}`);
-  process.exit(1);
+  fail(`Images directory not found: ${imagesDir}`);
 }
 
-const text = fs.readFileSync(sourceMdPath, 'utf8');
+const text = fs.readFileSync(sourceMdPath, "utf8");
 
-// Extract ids in order from the source markdown
 const idRegex = /%%\s*id:\s*"?([A-Za-z0-9_-]+)"?/g;
-
 const ids = [];
+
 let match;
 while ((match = idRegex.exec(text)) !== null) {
   ids.push(match[1]);
 }
 
-let exportBase = path.basename(exportedFromMdPath, path.extname(exportedFromMdPath));
-const prefix = `${exportBase}-`;
-
-const allSvgFiles = fs.readdirSync(imagesDir).filter(f => f.endsWith('.svg'));
-
-const files = allSvgFiles
-  .filter(f => f.startsWith(prefix))
-  .sort((a, b) => {
-    const ai = parseInt(a.match(/-(\d+)\.svg$/)?.[1] || '0', 10);
-    const bi = parseInt(b.match(/-(\d+)\.svg$/)?.[1] || '0', 10);
-    return ai - bi;
-  });
-
-console.log(`Source markdown   : ${sourceMdPath}`);
-console.log(`Exported from     : ${exportedFromMdPath}`);
-console.log(`Images directory  : ${imagesDir}`);
-console.log(`Export base       : ${exportBase}`);
-console.log(`Expected prefix   : ${prefix}`);
-console.log(`Found ids         : ${ids.length ? ids.join(', ') : '(none)'}`);
-console.log(`Matched files     : ${files.length}`);
-files.forEach(f => console.log(`  MATCH: ${f}`));
-
-if (files.length !== ids.length) {
-  console.warn(`Mismatch: ${files.length} exported files vs ${ids.length} ids in ${sourceMdPath}`);
+if (ids.length === 0) {
+  fail(`No Mermaid diagram ids found in ${sourceMdPath}`);
 }
 
-files.forEach((file, i) => {
-  if (!ids[i]) return;
+const duplicateIds = ids.filter((id, index) => ids.indexOf(id) !== index);
+if (duplicateIds.length > 0) {
+  fail(`Duplicate Mermaid ids found: ${[...new Set(duplicateIds)].join(", ")}`);
+}
 
+const allSvgFiles = fs.readdirSync(imagesDir).filter((file) => file.endsWith(".svg"));
+
+function extractTrailingNumber(file) {
+  const match = file.match(/(\d+)\.svg$/);
+  return match ? parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER;
+}
+
+function isLikelyMermaidExport(file) {
+  return prefixRegex.test(file);
+}
+let files = allSvgFiles.filter(isLikelyMermaidExport);
+
+files.sort((a, b) => {
+  const ai = extractTrailingNumber(a);
+  const bi = extractTrailingNumber(b);
+
+  if (ai !== bi) return ai - bi;
+  return a.localeCompare(b);
+});
+
+console.log(`Source markdown : ${sourceMdPath}`);
+console.log(`Images directory: ${imagesDir}`);
+console.log(`Found ids       : ${ids.join(", ")}`);
+console.log(`Matched files   : ${files.length}`);
+
+files.forEach((file) => console.log(`  MATCH: ${file}`));
+
+if (files.length !== ids.length) {
+  fail(`Mismatch: ${files.length} exported SVG files vs ${ids.length} ids.`);
+}
+
+files.forEach((file, index) => {
+  const id = ids[index];
   const src = path.join(imagesDir, file);
-  const dst = path.join(imagesDir, `${ids[i]}.svg`);
+  const dst = path.join(imagesDir, `${id}.svg`);
+
+  if (src === dst) {
+    console.log(`${file} already named ${id}.svg`);
+    return;
+  }
+
+  if (fs.existsSync(dst)) {
+    fs.unlinkSync(dst);
+  }
 
   fs.renameSync(src, dst);
-  console.log(`${file} → ${ids[i]}.svg`);
+  console.log(`${file} → ${id}.svg`);
 });
+
+console.log("Done.");

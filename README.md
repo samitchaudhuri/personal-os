@@ -107,6 +107,8 @@ personal-os/
 
 **Weekly:** `"Process my backlog"` + `"Clean up old tasks"`
 
+Task syntax and vault-specific conventions live in `vault/README.md`; workflow files should read that file rather than duplicating Obsidian Tasks rules here.
+
 ## Features
 
 - Goal-driven prioritization based on your vision

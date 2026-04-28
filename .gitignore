@@ -72,3 +72,4 @@ test_*.py
 .mcp_cache/
 *.pid
 *.lock
+node_modules

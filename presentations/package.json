@@ -3,7 +3,16 @@
   "private": true,
   "version": "1.0.0",
   "scripts": {
-    "build-mermaid": "node tools/inject-mermaid-theme.js",
-    "rename-svgs": "node tools/rename-mermaid-svgs.js"
+    "slides:clean": "rm -f ../vault/Attachments/oram-*.svg",
+    "slides:extract": "node tools/extract-mermaid.js \"../vault/Notes/ORAM Software Slides.marp.md\" \"build/ORAM Software Slides.mermaid.md\"",
+    "slides:render-mermaid": "mmdc -i \"build/ORAM Software Slides.mermaid.md\" -o \"../vault/Attachments/mmdc.svg\" --backgroundColor transparent",
+    "slides:rename": "node tools/rename-mermaid-svgs.js \"build/ORAM Software Slides.mermaid.md\" \"../vault/Attachments\" mmdc",
+    "slides:replace": "node tools/replace-mermaid-with-svgs.js \"../vault/Notes/ORAM Software Slides.marp.md\" \"build/ORAM Software Slides.marp.export.md\" \"../../vault/Attachments\"",
+    "slides:pdf": "marp \"build/ORAM Software Slides.marp.export.md\" --pdf --pdf-notes --allow-local-files",
+    "slides:finish": "npm run slides:rename && npm run slides:replace && npm run slides:pdf",
+    "build-slides": "npm run slides:clean && npm run slides:extract && npm run slides:render-mermaid && npm run slides:rename && npm run slides:replace && npm run slides:pdf"
+  },
+  "devDependencies": {
+    "@marp-team/marp-cli": "^4.3.1"
   }
 }

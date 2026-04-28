@@ -1,0 +1,24 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Slides: Build (CLI - mmdc)",
+      "type": "shell",
+      "command": "npm --prefix presentations run build-slides",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Slides: Extract Mermaid",
+      "type": "shell",
+      "command": "npm --prefix presentations run slides:extract",
+      "problemMatcher": []
+    },
+    {
+      "label": "Slides: Finish (MEP fallback)",
+      "type": "shell",
+      "command": "npm --prefix presentations run slides:rename && npm --prefix presentations run slides:replace && npm --prefix presentations run slides:pdf",
+      "problemMatcher": []
+    }
+  ]
+}
