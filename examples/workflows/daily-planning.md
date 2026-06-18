@@ -1,6 +1,6 @@
-# Morning Standup Workflow
+# Daily Planning Workflow
 
-A quick 2-minute check-in to set your focus for the day.
+A quick planning pass (often ~2 minutes to confirm priorities; vault workflow adds sequencing and velocity logging).
 
 ## The Prompt
 
@@ -57,5 +57,5 @@ Remind me what I was working on yesterday and what's next.
 ## Tips
 
 - Do this first thing, before checking email/Slack
-- Keep it under 2 minutes - just pick and start
+- Keep the initial priority pick tight — then start deep work
 - If you're stuck deciding, ask Claude to pick for you

@@ -1,4 +1,7 @@
-# Weekly Review Workflow
+# Personal Progress Review
+
+> **Canonical workflow:** `vault/Agent/Workflows/Personal Progress Review.md`
+> This example is a simplified version for tutorials.
 
 A 15-30 minute session to reflect on progress and plan ahead.
 

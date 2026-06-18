@@ -2,10 +2,23 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Slides: Build (CLI - mmdc)",
+      "label": "Slides: Build PDF (CLI - mmdc)",
       "type": "shell",
       "command": "npm --prefix presentations run build-slides",
       "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Slides: Build PPTX",
+      "type": "shell",
+      "command": "npm --prefix presentations run build-pptx",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Slides: PPT brief + assets (Claude route)",
+      "type": "shell",
+      "command": "npm --prefix presentations run build-ppt",
       "problemMatcher": []
     },
     {

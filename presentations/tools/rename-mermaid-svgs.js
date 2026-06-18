@@ -24,7 +24,8 @@ if (!prefixArg) {
   fail("Expected prefix argument (e.g. mmdc)");
 }
 
-const prefixRegex = new RegExp(`^${prefixArg}-\\d+\\.svg$`, "i");
+const ext = (process.argv[5] || "svg").replace(/^\./, "").toLowerCase();
+const prefixRegex = new RegExp(`^${prefixArg}-\\d+\\.${ext}$`, "i");
 
 if (!fs.existsSync(sourceMdPath)) {
   fail(`Source markdown not found: ${sourceMdPath}`);
@@ -53,10 +54,11 @@ if (duplicateIds.length > 0) {
   fail(`Duplicate Mermaid ids found: ${[...new Set(duplicateIds)].join(", ")}`);
 }
 
-const allSvgFiles = fs.readdirSync(imagesDir).filter((file) => file.endsWith(".svg"));
+const allSvgFiles = fs.readdirSync(imagesDir).filter((file) => file.endsWith(`.${ext}`));
 
+const trailingNumberRegex = new RegExp(`(\\d+)\\.${ext}$`);
 function extractTrailingNumber(file) {
-  const match = file.match(/(\d+)\.svg$/);
+  const match = file.match(trailingNumberRegex);
   return match ? parseInt(match[1], 10) : Number.MAX_SAFE_INTEGER;
 }
 
@@ -81,16 +83,16 @@ console.log(`Matched files   : ${files.length}`);
 files.forEach((file) => console.log(`  MATCH: ${file}`));
 
 if (files.length !== ids.length) {
-  fail(`Mismatch: ${files.length} exported SVG files vs ${ids.length} ids.`);
+  fail(`Mismatch: ${files.length} exported ${ext.toUpperCase()} files vs ${ids.length} ids.`);
 }
 
 files.forEach((file, index) => {
   const id = ids[index];
   const src = path.join(imagesDir, file);
-  const dst = path.join(imagesDir, `${id}.svg`);
+  const dst = path.join(imagesDir, `${id}.${ext}`);
 
   if (src === dst) {
-    console.log(`${file} already named ${id}.svg`);
+    console.log(`${file} already named ${id}.${ext}`);
     return;
   }
 
@@ -99,7 +101,7 @@ files.forEach((file, index) => {
   }
 
   fs.renameSync(src, dst);
-  console.log(`${file} → ${id}.svg`);
+  console.log(`${file} → ${id}.${ext}`);
 });
 
 console.log("Done.");

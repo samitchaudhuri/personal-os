@@ -26,12 +26,14 @@
     "clusterBkg": "#d2ccbf",
     "clusterBorder": "#999182",
     "defaultLinkColor": "#111111",
-    "edgeLabelBackground": "#00000000",
+    "edgeLabelBackground": "#d2ccbf",
     "nodeTextColor": "#111111"
   },
   "flowchart": {
     "nodeSpacing": 0,
     "rankSpacing": 0,
-    "useMaxWidth": true
+    "diagramPadding": 0,
+    "useMaxWidth": true,
+    "curve": "linear"
   }
 }

@@ -2,6 +2,8 @@
 
 Reusable workflows that your AI agent invokes on demand. These are referenced from AGENTS.md and executed when relevant tasks are detected.
 
+> **Canonical source:** `vault/Agent/Workflows/README.md` contains the authoritative workflow list, cadence table, and trigger phrases. This folder holds simplified examples for tutorials.
+
 ## Skill Workflows
 
 These workflows are automatically invoked by your agent when a matching task is detected.
@@ -14,14 +16,16 @@ These workflows are automatically invoked by your agent when a matching task is 
 
 | Workflow | Time | When to Use |
 |----------|------|-------------|
-| [Morning Standup](morning-standup.md) | 2 min | Start of day - pick your focus |
+| [Daily Planning](daily-planning.md) | 2 min | Start of day - pick your focus |
 | [Backlog Processing](backlog-processing.md) | 5-10 min | End of day or when backlog builds up |
 
 ## Weekly Workflows
 
 | Workflow | Time | When to Use |
 |----------|------|-------------|
-| [Weekly Review](weekly-review.md) | 15-30 min | Friday PM or Sunday/Monday |
+| [Personal Progress Review](weekly-review.md) | 15-30 min | Friday PM or Sunday/Monday |
+
+*Note: The file uses the legacy name `weekly-review.md` for URL stability; canonical workflow is `vault/Agent/Workflows/Personal Progress Review.md`.*
 
 ## Quick Reference: Common Prompts
 

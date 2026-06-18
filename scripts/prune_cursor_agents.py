@@ -4,10 +4,12 @@
 Keeps chats where NOT (isArchived and lastUpdatedAt <= cutoff).
 
 Default cutoff: start of 2026-04-23 in America/Los_Angeles (sessions with no
-updates after local 2026-04-22).
+updates after local 2026-04-22). Many archived rows stay if they were touched
+after that date; use `--all-archived` to wipe every archived composer.
 
-  python3 scripts/prune_cursor_agents.py          # dry run
-  python3 scripts/prune_cursor_agents.py --apply  # Cursor must be quit first!
+  python3 scripts/prune_cursor_agents.py              # dry run (cutoff mode)
+  python3 scripts/prune_cursor_agents.py --all-archived # dry run: remove ALL archived
+  python3 scripts/prune_cursor_agents.py --apply      # Cursor must be quit first!
 
 """
 from __future__ import annotations
@@ -18,7 +20,7 @@ import os
 import shutil
 import sqlite3
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 
 try:
     import zoneinfo
@@ -50,8 +52,29 @@ def main() -> int:
         action="store_true",
         help="compare createdAt instead of lastUpdatedAt to cutoff",
     )
+    parser.add_argument(
+        "--all-archived",
+        action="store_true",
+        help="remove every archived composer (ignore cutoff; unarchived kept)",
+    )
+    parser.add_argument(
+        "--cutoff-date",
+        metavar="YYYY-MM-DD",
+        help=(
+            "America/Los_Angeles inclusive end-of-day last touch; "
+            "default is 2026-04-22 (same as prune if lastUpdatedAt "
+            "< 2026-04-23 00:00). Ignored with --all-archived."
+        ),
+    )
     args = parser.parse_args()
-    cutoff = ts_ms(DEFAULT_CUTOFF)
+
+    if args.cutoff_date:
+        y, m, d = map(int, args.cutoff_date.split("-", 3))
+        cutoff_dt = datetime(y, m, d, 0, 0, 0, tzinfo=TZ) + timedelta(days=1)
+        cutoff_ms = ts_ms(cutoff_dt)
+    else:
+        cutoff_dt = DEFAULT_CUTOFF
+        cutoff_ms = ts_ms(cutoff_dt)
 
     if not os.path.isfile(DB):
         print("missing DB:", DB)
@@ -77,13 +100,24 @@ def main() -> int:
         if not h.get("isArchived"):
             keep.append(h)
             continue
+        if args.all_archived:
+            to_drop.append(h)
+            continue
         t = int(h.get(cmp_key, 0) or 0)
-        if t <= cutoff:
+        if t <= cutoff_ms:
             to_drop.append(h)
         else:
             keep.append(h)
 
-    print(f"Cutoff ({cmp_key}) <= {DEFAULT_CUTOFF.isoformat()}  →  ms {cutoff}")
+    if args.all_archived:
+        mode = "ALL archived composers (ignore cutoff)"
+        print(mode)
+        print(f"Using compare field for listing only: {cmp_key}")
+    else:
+        print(
+            f"Cutoff ({cmp_key}) < {cutoff_dt.isoformat()}  "
+            f"→ prune when {cmp_key} <= end of cutoff day  →  ms {cutoff_ms}"
+        )
     print(f"Will remove {len(to_drop)} archived head(s); keep {len(keep)} total.")
 
     for h in sorted(to_drop, key=lambda x: x.get(cmp_key, 0)):

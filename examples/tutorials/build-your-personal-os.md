@@ -188,7 +188,7 @@ Instead of putting everything in AGENTS.md, you can create **workflow files** th
 ```
 examples/workflows/
 ├── content-generation.md  # How to write in your voice
-├── morning-standup.md     # Daily planning routine
+├── daily-planning.md      # Daily planning routine (priorities + sequencing)
 └── weekly-review.md       # Reflection process
 ```
 
@@ -200,7 +200,7 @@ In AGENTS.md, you just reference them:
 | Trigger | Workflow File |
 |---------|---------------|
 | Writing tasks | examples/workflows/content-generation.md |
-| "What should I work on?" | examples/workflows/morning-standup.md |
+| "What should I work on?" | examples/workflows/daily-planning.md |
 ```
 
 **Why this matters**: It keeps your main instructions lightweight and makes workflows reusable and shareable.

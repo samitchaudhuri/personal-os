@@ -8,7 +8,7 @@ Real-world usage patterns for day-to-day productivity.
 
 | Workflow | Time | Description |
 |----------|------|-------------|
-| [Morning Standup](workflows/morning-standup.md) | 2 min | Start your day with focus |
+| [Daily Planning](workflows/daily-planning.md) | 2 min | Start your day with focus |
 | [Backlog Processing](workflows/backlog-processing.md) | 5-10 min | Turn messy notes into tasks |
 | [Weekly Review](workflows/weekly-review.md) | 15-30 min | Reflect and plan ahead |
 
