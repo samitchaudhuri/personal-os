@@ -1,0 +1,20 @@
+{
+  "name": "oram-light",
+  "font": "Helvetica Neue",
+  "background": "#ffffff",
+  "ink": "#1a1a1a",
+  "accent": "#4a6fa5",
+  "takeawayFill": "#e8eef6",
+  "takeawayText": "#1a1a1a",
+  "showKicker": true,
+  "showSlideNumber": true,
+  "showTakeawayBand": true,
+  "sizes": {
+    "title": 26,
+    "kicker": 13,
+    "body": 18,
+    "heading": 20,
+    "takeaway": 17,
+    "number": 13
+  }
+}

@@ -47,8 +47,25 @@ if (replacements === 0) {
   fail("No Mermaid blocks found.");
 }
 
+// Drop any slide carrying the local `<!-- _build: skip -->` hint so it is kept in
+// the source deck but excluded from the exported PDF. Same convention the PPTX
+// brief generator honors, so one marker skips a slide across every route.
+const SKIP_SLIDE_RE = /<!--\s*_build:\s*skip\s*-->/;
+
+function dropSkippedSlides(md) {
+  const fmMatch = md.match(/^---\n[\s\S]*?\n---\n?/);
+  const head = fmMatch ? fmMatch[0] : "";
+  const rest = fmMatch ? md.slice(fmMatch[0].length) : md;
+  const kept = rest.split(/\n---\s*\n/).filter((chunk) => !SKIP_SLIDE_RE.test(chunk));
+  return head + kept.join("\n---\n");
+}
+
+const finalText = dropSkippedSlides(outputText);
+const skipped = outputText.split(/\n---\s*\n/).length - finalText.split(/\n---\s*\n/).length;
+
 fs.mkdirSync(path.dirname(outputMarpPath), { recursive: true });
-fs.writeFileSync(outputMarpPath, outputText, "utf8");
+fs.writeFileSync(outputMarpPath, finalText, "utf8");
 
 console.log(`Replaced ${replacements} Mermaid block(s).`);
+if (skipped > 0) console.log(`Skipped ${skipped} slide(s) marked _build: skip.`);
 console.log(`Wrote ${outputMarpPath}.`);

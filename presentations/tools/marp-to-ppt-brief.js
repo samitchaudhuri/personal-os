@@ -53,10 +53,14 @@ const designText = extractFrontmatterBlock(frontmatter, "ppt_design");
 body = body.replace(/<style>[\s\S]*?<\/style>/g, "");
 
 // --- Split into slides on lines that are exactly `---` ---
+// A slide carrying the local `<!-- _build: skip -->` hint is kept in the source
+// deck but excluded from every generated output (PDF + both PPTX routes).
+const SKIP_SLIDE_RE = /<!--\s*_build:\s*skip\s*-->/;
 const slideChunks = body
   .split(/\n---\s*\n/)
   .map((s) => s.trim())
-  .filter((s) => s.length);
+  .filter((s) => s.length)
+  .filter((s) => !SKIP_SLIDE_RE.test(s));
 
 function stripTags(s) {
   return s

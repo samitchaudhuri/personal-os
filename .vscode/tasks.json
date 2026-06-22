@@ -16,9 +16,43 @@
       "problemMatcher": []
     },
     {
+      "label": "Slides: Build PPTX (active file)",
+      "type": "shell",
+      "command": "f=$(basename \"${file}\"); if [[ \"$f\" == *.marp.md ]]; then MARP=\"${f%.marp.md}\"; else DECK=\"${f%.md}\"; DECK=\"${DECK% Deck}\"; fi; npm --prefix presentations run build-pptx",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Slides: Build Combined PPTX (HW + SW)",
+      "type": "shell",
+      "command": "npm --prefix presentations run build-combined",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Slides: Build Combined PPTX (active file)",
+      "type": "shell",
+      "command": "f=$(basename \"${file}\"); if [[ \"$f\" == *.marp.md ]]; then MARP=\"${f%.marp.md}\"; else DECK=\"${f%.md}\"; DECK=\"${DECK% Deck}\"; fi; npm --prefix presentations run build-combined",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Slides: Build PDF (active file)",
+      "type": "shell",
+      "command": "f=$(basename \"${file}\"); if [[ \"$f\" == *.marp.md ]]; then MARP=\"${f%.marp.md}\"; else DECK=\"${f%.md}\"; DECK=\"${DECK% Deck}\"; fi; npm --prefix presentations run build-slides",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
       "label": "Slides: PPT brief + assets (Claude route)",
       "type": "shell",
       "command": "npm --prefix presentations run build-ppt",
+      "problemMatcher": []
+    },
+    {
+      "label": "Slides: PPT brief + assets (active file)",
+      "type": "shell",
+      "command": "f=$(basename \"${file}\"); if [[ \"$f\" == *.marp.md ]]; then MARP=\"${f%.marp.md}\"; else DECK=\"${f%.md}\"; DECK=\"${DECK% Deck}\"; fi; npm --prefix presentations run build-ppt",
       "problemMatcher": []
     },
     {

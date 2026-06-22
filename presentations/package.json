@@ -3,24 +3,27 @@
   "private": true,
   "version": "1.0.0",
   "config": {
-    "deck": "ORAM Software Slides",
-    "theme": "gaia"
+    "deck": "ORAM Company Pitch",
+    "marp": "ORAM Software Slides",
+    "theme": "oram-light"
   },
   "scripts": {
     "slides:clean": "rm -f \"../vault/Attachments/mmdc\"*.svg",
-    "slides:extract": "node tools/extract-mermaid.js \"../vault/Notes/$npm_package_config_deck.marp.md\" \"build/$npm_package_config_deck.mermaid.md\"",
-    "slides:render-mermaid": "mmdc -i \"build/$npm_package_config_deck.mermaid.md\" -o \"../vault/Attachments/mmdc.svg\" --backgroundColor transparent",
-    "slides:rename": "node tools/rename-mermaid-svgs.js \"build/$npm_package_config_deck.mermaid.md\" \"../vault/Attachments\" mmdc",
-    "slides:replace": "node tools/replace-mermaid-with-svgs.js \"../vault/Notes/$npm_package_config_deck.marp.md\" \"build/$npm_package_config_deck.marp.export.md\" \"../../vault/Attachments\"",
-    "slides:pdf": "marp \"build/$npm_package_config_deck.marp.export.md\" --pdf --pdf-notes --allow-local-files --no-stdin",
-    "slides:brief": "node tools/marp-to-ppt-brief.js \"../vault/Notes/$npm_package_config_deck.marp.md\" \"build/$npm_package_config_deck.ppt-brief.md\"",
-    "slides:render-png": "rm -rf build/png && mkdir -p build/png && mmdc -i \"build/$npm_package_config_deck.mermaid.md\" -o \"build/png/mmdc.png\" -s 3 --backgroundColor white",
-    "slides:rename-png": "node tools/rename-mermaid-svgs.js \"build/$npm_package_config_deck.mermaid.md\" \"build/png\" mmdc png",
-    "slides:pptx": ".venv/bin/python tools/brief-to-pptx.py \"build/$npm_package_config_deck.ppt-brief.md\" \"build/png\" \"build/$npm_package_config_deck.marp.export.pptx\" \"pptx-themes/$npm_package_config_theme.json\"",
+    "slides:extract": "node tools/extract-mermaid.js \"../vault/Notes/${MARP:-$npm_package_config_marp}.marp.md\" \"build/${DECK:-$npm_package_config_deck}.mermaid.md\"",
+    "slides:render-mermaid": "mmdc -i \"build/${DECK:-$npm_package_config_deck}.mermaid.md\" -o \"../vault/Attachments/mmdc.svg\" --backgroundColor transparent",
+    "slides:rename": "node tools/rename-mermaid-svgs.js \"build/${DECK:-$npm_package_config_deck}.mermaid.md\" \"../vault/Attachments\" mmdc",
+    "slides:replace": "node tools/replace-mermaid-with-svgs.js \"../vault/Notes/${MARP:-$npm_package_config_marp}.marp.md\" \"build/${DECK:-$npm_package_config_deck}.marp.export.md\" \"../../vault/Attachments\"",
+    "slides:pdf": "marp \"build/${DECK:-$npm_package_config_deck}.marp.export.md\" --pdf --pdf-notes --allow-local-files --no-stdin",
+    "slides:brief": "node tools/marp-to-ppt-brief.js \"../vault/Notes/${MARP:-$npm_package_config_marp}.marp.md\" \"build/${DECK:-$npm_package_config_deck}.ppt-brief.md\"",
+    "slides:render-png": "rm -rf build/png && mkdir -p build/png && mmdc -i \"build/${DECK:-$npm_package_config_deck}.mermaid.md\" -o \"build/png/mmdc.png\" -s 3 --backgroundColor white",
+    "slides:rename-png": "node tools/rename-mermaid-svgs.js \"build/${DECK:-$npm_package_config_deck}.mermaid.md\" \"build/png\" mmdc png",
+    "slides:pptx": ".venv/bin/python tools/brief-to-pptx.py \"build/${DECK:-$npm_package_config_deck}.ppt-brief.md\" \"build/png\" \"build/${DECK:-$npm_package_config_deck}.marp.export.pptx\" \"pptx-themes/$npm_package_config_theme.json\"",
+    "slides:combine": ".venv/bin/python tools/combine-pptx.py \"build/${DECK:-$npm_package_config_deck}.ppt-brief.md\" \"build/png\" \"build/${DECK:-$npm_package_config_deck}.combined.pptx\" \"../vault/Notes/${DECK:-$npm_package_config_deck} Deck.md\" \"pptx-themes/$npm_package_config_theme.json\"",
     "slides:finish": "npm run slides:rename && npm run slides:replace && npm run slides:pdf",
     "build-slides": "npm run slides:clean && npm run slides:extract && npm run slides:render-mermaid && npm run slides:rename && npm run slides:replace && npm run slides:pdf",
     "build-ppt": "npm run slides:clean && npm run slides:extract && npm run slides:render-mermaid && npm run slides:rename && npm run slides:brief",
-    "build-pptx": "npm run slides:extract && npm run slides:render-png && npm run slides:rename-png && npm run slides:brief && npm run slides:pptx"
+    "build-pptx": "npm run slides:extract && npm run slides:render-png && npm run slides:rename-png && npm run slides:brief && npm run slides:pptx",
+    "build-combined": "npm run slides:extract && npm run slides:render-png && npm run slides:rename-png && npm run slides:brief && npm run slides:combine"
   },
   "devDependencies": {
     "@marp-team/marp-cli": "^4.3.1"
