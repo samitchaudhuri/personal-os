@@ -1,0 +1,66 @@
+{
+  "name": "oram-common",
+  "font": "Helvetica Neue",
+  "slide": {
+    "widthIn": 13.333,
+    "heightIn": 7.5
+  },
+  "layout": {
+    "marginIn": 0.7,
+    "chromeTopIn": 0.4,
+    "kickerHeightIn": 0.2,
+    "gapAfterKickerIn": 0.06,
+    "gapAfterTitleIn": 0.05,
+    "gapAfterDiagramIn": 0.08,
+    "takeawayBottomIn": 0.35,
+    "takeawayBandHeightIn": 0.85,
+    "diagramMaxHeightPx": 260,
+    "diagramMaxZoneFraction": 0.42,
+    "lineHeight": 1.22
+  },
+  "typography": {
+    "marp": {
+      "bodyPx": 24,
+      "headings": {
+        "h1": 1.45,
+        "h2": 1.2,
+        "h3": 1.05
+      },
+      "labelScale": 0.55,
+      "labelLetterSpacingEm": 0.06,
+      "takeawayScale": 0.9,
+      "takeawayPaddingEm": 0.45,
+      "takeawayBottomPx": 40,
+      "takeawayInsetPx": 60,
+      "gapAfterTitleEm": 0.08,
+      "diagramMarginTopEm": 0.08,
+      "diagramMarginBottomEm": 0.1
+    },
+    "pptx": {
+      "title": 26,
+      "kicker": 13,
+      "body": 18,
+      "heading": 20,
+      "takeaway": 17,
+      "number": 13,
+      "bodyLineSpacing": 1.15,
+      "takeawayTextInsetIn": 0.2
+    }
+  },
+  "mermaid": {
+    "theme": "base",
+    "htmlLabels": true,
+    "fontFamily": "Inter, -apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif",
+    "flowchart": {
+      "nodeSpacing": 0,
+      "rankSpacing": 0,
+      "diagramPadding": 0,
+      "useMaxWidth": true,
+      "curve": "linear"
+    }
+  },
+  "columns": {
+    "gapPx": 28,
+    "leftPercent": 42
+  }
+}

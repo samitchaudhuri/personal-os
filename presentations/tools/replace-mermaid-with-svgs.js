@@ -2,23 +2,27 @@
 
 const fs = require("fs");
 const path = require("path");
+const { resolveDeckPaths } = require("./resolve-deck-sources");
 
 function fail(message) {
   console.error(`Error: ${message}`);
   process.exit(1);
 }
 
-const [, , sourceMarpPathArg, outputMarpPathArg, svgRelativeDirArg] = process.argv;
+const paths = resolveDeckPaths();
+const sourceMarpPath = path.resolve(
+  process.argv[2] || paths.marpPath
+);
+const outputMarpPath = path.resolve(
+  process.argv[3] || paths.marpExportPath
+);
+const svgRelativeDir = (process.argv[4] || paths.svgRelativeDir).replace(/\/$/, "");
 
-if (!sourceMarpPathArg || !outputMarpPathArg || !svgRelativeDirArg) {
+if (!sourceMarpPath || !outputMarpPath || !svgRelativeDir) {
   fail(
-    'Usage: node presentations/tools/replace-mermaid-with-svgs.js "<source.marp.md>" "<output.marp.export.md>" "<svg-relative-dir>"'
+    "Usage: node tools/replace-mermaid-with-svgs.js [source.marp.md] [output.marp.export.md] [svg-relative-dir]"
   );
 }
-
-const sourceMarpPath = path.resolve(process.cwd(), sourceMarpPathArg);
-const outputMarpPath = path.resolve(process.cwd(), outputMarpPathArg);
-const svgRelativeDir = svgRelativeDirArg.replace(/\/$/, "");
 
 if (!fs.existsSync(sourceMarpPath)) {
   fail(`Source Marp file not found: ${sourceMarpPath}`);

@@ -1,25 +1,24 @@
 #!/usr/bin/env node
 
 // Generate a PowerPoint-connector brief from a Marp deck.
-// The Marp file is the single source of truth. Per-deck design intent lives in
-// the deck frontmatter under `ppt_design:` (a YAML block scalar) so it survives
-// regeneration. This script is deterministic: edit the .marp.md and rerun.
+// The Marp file is the single source of truth for slide content. Visual design
+// for automated builds comes from deck_theme: (presentations/themes/).
+// Optional legacy `ppt_design:` in Marp frontmatter overrides the brief's
+// "Design direction" section for the Claude connector route only.
 
 const fs = require("fs");
 const path = require("path");
+const { resolveDeckPaths } = require("./resolve-deck-sources");
 
 function fail(message) {
   console.error(`Error: ${message}`);
   process.exit(1);
 }
 
-const [, , inputArg, outputArg] = process.argv;
-if (!inputArg || !outputArg) {
-  fail('Usage: node tools/marp-to-ppt-brief.js "<deck.marp.md>" "<out.ppt-brief.md>"');
-}
+const paths = resolveDeckPaths();
+const inputPath = path.resolve(process.argv[2] || paths.marpPath);
+const outputPath = path.resolve(process.argv[3] || paths.pptBriefPath);
 
-const inputPath = path.resolve(process.cwd(), inputArg);
-const outputPath = path.resolve(process.cwd(), outputArg);
 if (!fs.existsSync(inputPath)) fail(`Input not found: ${inputPath}`);
 
 const deckName = path.basename(inputPath).replace(/\.marp\.md$/, "");
@@ -141,7 +140,7 @@ out += `generated_by: presentations/tools/marp-to-ppt-brief.js\n`;
 out += `source: ${deckName}.marp.md\n`;
 out += `---\n`;
 out += `# PPT generation brief — ${deckName}\n\n`;
-out += `> Generated artifact — do not hand-edit. Edit \`${deckName}.marp.md\` (content + diagrams) and its \`ppt_design:\` frontmatter, then regenerate.\n\n`;
+out += `> Generated artifact — do not hand-edit. Edit \`${deckName}.marp.md\` (content + diagrams), then regenerate. Colors and layout: \`deck_theme:\` on the source or deck note → \`presentations/themes/\`.\n\n`;
 out += `Paste this into Claude with the PowerPoint connector enabled, and attach the SVGs listed below.\n\n`;
 out += `## Instructions for Claude\n\n`;
 out += `- Build one slide per "## Slide N" section, in order.\n`;

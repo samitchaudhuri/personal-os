@@ -16,9 +16,16 @@
       "problemMatcher": []
     },
     {
-      "label": "Slides: Build PPTX (active file)",
+      "label": "Slides: Build PPTX (Marp active file)",
       "type": "shell",
-      "command": "f=$(basename \"${file}\"); if [[ \"$f\" == *.marp.md ]]; then MARP=\"${f%.marp.md}\"; else DECK=\"${f%.md}\"; DECK=\"${DECK% Deck}\"; fi; npm --prefix presentations run build-pptx",
+      "command": "MARP_INPUT=\"${file}\" npm --prefix presentations run build-pptx",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Slides: Build PPTX (deck active file)",
+      "type": "shell",
+      "command": "DECK_NOTE=\"${file}\" npm --prefix presentations run build-pptx",
       "group": "build",
       "problemMatcher": []
     },
@@ -30,16 +37,23 @@
       "problemMatcher": []
     },
     {
-      "label": "Slides: Build Combined PPTX (active file)",
+      "label": "Slides: Build Combined PPTX (deck active file)",
       "type": "shell",
-      "command": "f=$(basename \"${file}\"); if [[ \"$f\" == *.marp.md ]]; then MARP=\"${f%.marp.md}\"; else DECK=\"${f%.md}\"; DECK=\"${DECK% Deck}\"; fi; npm --prefix presentations run build-combined",
+      "command": "DECK_NOTE=\"${file}\" npm --prefix presentations run build-combined",
       "group": "build",
       "problemMatcher": []
     },
     {
-      "label": "Slides: Build PDF (active file)",
+      "label": "Slides: Build PDF (Marp active file)",
       "type": "shell",
-      "command": "f=$(basename \"${file}\"); if [[ \"$f\" == *.marp.md ]]; then MARP=\"${f%.marp.md}\"; else DECK=\"${f%.md}\"; DECK=\"${DECK% Deck}\"; fi; npm --prefix presentations run build-slides",
+      "command": "MARP_INPUT=\"${file}\" npm --prefix presentations run build-slides",
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Slides: Build PDF (deck active file)",
+      "type": "shell",
+      "command": "DECK_NOTE=\"${file}\" npm --prefix presentations run build-slides",
       "group": "build",
       "problemMatcher": []
     },
@@ -50,9 +64,15 @@
       "problemMatcher": []
     },
     {
-      "label": "Slides: PPT brief + assets (active file)",
+      "label": "Slides: PPT brief + assets (Marp active file)",
       "type": "shell",
-      "command": "f=$(basename \"${file}\"); if [[ \"$f\" == *.marp.md ]]; then MARP=\"${f%.marp.md}\"; else DECK=\"${f%.md}\"; DECK=\"${DECK% Deck}\"; fi; npm --prefix presentations run build-ppt",
+      "command": "MARP_INPUT=\"${file}\" npm --prefix presentations run build-ppt",
+      "problemMatcher": []
+    },
+    {
+      "label": "Slides: PPT brief + assets (deck active file)",
+      "type": "shell",
+      "command": "DECK_NOTE=\"${file}\" npm --prefix presentations run build-ppt",
       "problemMatcher": []
     },
     {

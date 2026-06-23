@@ -1,130 +1,58 @@
 # presentations
 
-Build layer for slide sources in the vault. Scripts, themes, and generated artifacts live here; slide **content** and deck **manifests** live in `../vault/Notes/`.
+Build tooling for slide decks whose **content and manifests** live in `../vault/Notes/`.
 
-## Documentation map
+## Who reads what
 
-| Doc | Role |
+| You are… | Start here |
 | --- | --- |
-| `vault/Agent/Workflows/Slide Deck Development.md` | End-to-end deck workflow: deck note, manifest, sources, combine, iteration |
-| `vault/Notes/Marp Slide Build Runbook.md` | Author/export one `.marp.md` (preview, Mermaid, PDF/PPTX) |
-| **This README** | Canonical **command registry** — scripts, outputs, env vars, VS Code tasks |
+| **Authoring or building slides** | [[Slide Deck Development]] (combined decks) or [[Marp Slide Build Runbook]] (one Marp file) |
+| **Changing colors or layout** | [`themes/README.md`](themes/README.md) |
+| **Extending the pipeline** | [`BUILD.md`](BUILD.md) |
 
-Do not duplicate the full command reference in the vault docs; link here instead.
+## Why this folder exists
 
-## Relationship to the vault
+Slide sources (Marp markdown, PowerPoint, deck manifests) belong in the vault. This folder holds **scripts, themes, and generated output** so builds stay reproducible: Mermaid → SVG/PNG, Marp → PDF, brief → PPTX, manifest → combined deck.
 
-Paths are relative from `presentations/` (`vault/` is a sibling under the repo root):
+## What lives where
 
-| Path | Role |
+| Location | Role |
 | --- | --- |
-| `../vault/Notes/<deck> Deck.md` | Deck note: manifest, slide detail, `markdown_sources` / `pptx_sources` |
-| `../vault/Notes/<marp>.marp.md` | Markdown/Marp source (`config.marp` or `MARP` env) |
-| `../vault/Attachments/<id>.svg` | Rendered diagram SVGs (PDF / brief routes) |
-| `build/<deck>.*` | Generated intermediates and outputs (gitignored) |
-| `build/<file>.pptx` | PowerPoint sources referenced by deck notes |
+| `vault/Notes/<deck> Deck.md` | Manifest, `deck_theme`, `deck_sources`, combine recipe |
+| `vault/Notes/<name>.marp.md` | Slide content, Mermaid, speaker notes |
+| `vault/Attachments/<id>.svg` | Rendered diagrams (PDF route) |
+| `presentations/build/<prefix>.*` | Generated intermediates and outputs (gitignored) |
+| `presentations/themes/` | ORAM layout + color tokens |
+| `presentations/tools/` | Build scripts — see [`BUILD.md`](BUILD.md) |
 
-## Folder structure
+## How to build
 
+Open the file you are working on, then run the matching VS Code task:
+
+| Open | Task family | Output |
+| --- | --- | --- |
+| `<deck> Deck.md` | **deck active file** (PDF, PPTX, **combine**) | `build/<deck>.*` |
+| `.marp.md` | **Marp active file** (PDF, PPTX — software half only) | `build/<marp-stem>.*` |
+
+Combine requires the **deck note** open — not the Marp file alone.
+
+Command names, env vars, and pipeline steps: [`BUILD.md`](BUILD.md).
+
+## First-time setup
+
+From repo root:
+
+```bash
+cd presentations && npm install
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 ```
-presentations/
-├── package.json            # config.deck, config.marp, config.theme, npm scripts
-├── mermaid-themes/         # diagram themes (injected at extract)
-├── pptx-themes/            # slide-chrome palette for local PPTX / combine
-├── tools/                  # build scripts
-├── build/                  # generated (gitignored)
-└── .venv/                  # python-pptx for PPTX routes (gitignored)
-```
 
-## Commands (canonical)
+Also on PATH: **`mmdc`** (`@mermaid-js/mermaid-cli`).
 
-Run from repo root unless noted.
+## Conventions (quick reference)
 
-### Top-level routes
+**Deck note frontmatter:** `deck_theme:` (`oram-light` \| `oram-dark`), `deck_sources:` — plus manifest table in the body for combine. Output prefix from filename (`<name> Deck.md`).
 
-| Script | Pipeline | Primary output |
-| --- | --- | --- |
-| `npm --prefix presentations run build-slides` | clean → extract → render SVG → rename → replace → pdf | `build/<deck>.marp.export.pdf` |
-| `npm --prefix presentations run build-ppt` | clean → extract → render SVG → rename → brief | `build/<deck>.ppt-brief.md` + SVGs |
-| `npm --prefix presentations run build-pptx` | extract → render PNG → rename → brief → pptx | `build/<deck>.marp.export.pptx` |
-| `npm --prefix presentations run build-combined` | extract → render PNG → rename → brief → combine | `build/<deck>.combined.pptx` |
+**Marp frontmatter:** `marp: true`, `deck_theme:` (required when building from the Marp file). Optional Marp `theme:` (e.g. `gaia`) is for editor preview only.
 
-Deck workflow (when to use each route): `vault/Agent/Workflows/Slide Deck Development.md` § Step 4 — Build the deck.
-
-### Individual steps
-
-| Script | Purpose |
-| --- | --- |
-| `slides:clean` | Remove transient `mmdc*.svg` in Attachments |
-| `slides:extract` | Mermaid blocks → `build/<deck>.mermaid.md` |
-| `slides:render-mermaid` | SVG render (PDF route) |
-| `slides:render-png` | PNG render at 3× (PPTX route) → `build/png/` |
-| `slides:rename` | `mmdc-N.svg` → `<diagram-id>.svg` in Attachments |
-| `slides:rename-png` | Same for PNGs in `build/png/` |
-| `slides:replace` | Inject SVG refs → `build/<deck>.marp.export.md` |
-| `slides:pdf` | Marp CLI → PDF |
-| `slides:brief` | Derive `build/<deck>.ppt-brief.md` from Marp source |
-| `slides:pptx` | Local PPTX from brief + PNGs |
-| `slides:combine` | Merge sources per deck note manifest |
-| `slides:finish` | rename + replace + pdf (MEP fallback step 3) |
-
-### VS Code tasks (`.vscode/tasks.json`)
-
-| Task | Runs |
-| --- | --- |
-| Slides: Build PDF (CLI - mmdc) | `build-slides` |
-| Slides: Build PDF (active file) | `build-slides` + `DECK`/`MARP` from editor file |
-| Slides: Build PPTX | `build-pptx` |
-| Slides: Build PPTX (active file) | `build-pptx` + active file |
-| Slides: Build Combined PPTX (HW + SW) | `build-combined` |
-| Slides: Build Combined PPTX (active file) | `build-combined` + active file |
-| Slides: PPT brief + assets (Claude route) | `build-ppt` |
-| Slides: PPT brief + assets (active file) | `build-ppt` + active file |
-| Slides: Extract Mermaid | `slides:extract` |
-| Slides: Finish (MEP fallback) | `slides:finish` |
-
-Marp authoring (preview, Mermaid conventions): `vault/Notes/Marp Slide Build Runbook.md`.
-
-## Targeting a deck
-
-Scripts resolve names from `presentations/package.json` `config` (overridable via env):
-
-| Variable | Selects | Default (`config`) |
-| --- | --- | --- |
-| **`DECK`** | Deck note stem, build artifact prefix, combine identity | `deck` → `ORAM Company Pitch` |
-| **`MARP`** | Marp source file `../vault/Notes/<marp>.marp.md` | `marp` → `ORAM Software Slides` |
-| **`config.theme`** | `mermaid-themes/` + `pptx-themes/` palette | `oram-light` |
-
-**Active file:** open `<deck> Deck.md` or `<marp>.marp.md` and run a **"… (active file)"** task. Deck note sets `DECK`; Marp file sets `MARP`; the other falls back to `config`.
-
-**Headless/CLI:** bare `npm run …` uses `config.deck` + `config.marp`.
-
-Derived filenames (`.mermaid.md`, `.ppt-brief.md`, `.combined.pptx`, etc.) use the resolved `DECK` name. Per-deck PPT design intent: `ppt_design:` in the Marp frontmatter → brief **Design direction**.
-
-## Theming
-
-| Layer | File | Used by |
-| --- | --- | --- |
-| Diagrams | `mermaid-themes/<name>.json` | `extract-mermaid.js`; also set `theme:` in Marp frontmatter |
-| Slide chrome | `pptx-themes/<name>.json` | `brief-to-pptx.py`, `combine-pptx.py` via `config.theme` |
-
-`pptx-themes` keys: `font`, `background`, `ink`, `accent`, `takeawayFill`, `takeawayText`, `showKicker`, `showSlideNumber`, `showTakeawayBand`, `sizes` (points). Missing keys fall back to generator defaults.
-
-## Outputs and safekeeping
-
-`build/` is gitignored and regenerable. Copy PDF/PPTX out for sharing. Do not hand-edit generated briefs or combined decks.
-
-## Cleanup
-
-`slides:clean` removes transient `mmdc*.svg` renders. Final `<id>.svg` files are overwritten on rename each build. Deleted diagrams leave orphaned SVGs in `vault/Attachments/` — remove by hand.
-
-## Requirements
-
-- Node: `npm install` in `presentations/` (`@marp-team/marp-cli` in devDependencies)
-- **`mmdc`** on PATH (`@mermaid-js/mermaid-cli`)
-- PPTX/combine: Python venv — `python3 -m venv .venv && .venv/bin/pip install -r requirements.txt`
-
-## Deferred / TODO
-
-- Port local generator to PptxGenJS to drop Python venv
-- Fold diagram theme into `pptx-themes` for unified light/dark
+Do not hand-edit files under `build/`. Copy PDF/PPTX out for sharing.

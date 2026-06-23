@@ -2,29 +2,38 @@
 
 const fs = require("fs");
 const path = require("path");
+const { resolveDeckPaths } = require("./resolve-deck-sources");
 
 function fail(message) {
   console.error(`Error: ${message}`);
   process.exit(1);
 }
 
-const [, , sourceMdPathArg, imagesDirArg] = process.argv;
+const paths = resolveDeckPaths();
 
-if (!sourceMdPathArg || !imagesDirArg) {
-  fail(
-    'Usage: node presentations/tools/rename-mermaid-svgs.js "<source.mermaid.md>" "<images-dir>"'
-  );
+let sourceMdPathArg;
+let imagesDirArg;
+let prefixArg;
+let ext;
+
+if (process.argv[2]?.endsWith(".md")) {
+  sourceMdPathArg = process.argv[2];
+  imagesDirArg = process.argv[3];
+  prefixArg = process.argv[4];
+  ext = process.argv[5] || "svg";
+} else {
+  prefixArg = process.argv[2] || "mmdc";
+  ext = (process.argv[3] || "svg").replace(/^\./, "").toLowerCase();
 }
 
-const sourceMdPath = path.resolve(process.cwd(), sourceMdPathArg);
-const imagesDir = path.resolve(process.cwd(), imagesDirArg);
-
-const prefixArg = process.argv[4];
 if (!prefixArg) {
   fail("Expected prefix argument (e.g. mmdc)");
 }
 
-const ext = (process.argv[5] || "svg").replace(/^\./, "").toLowerCase();
+const sourceMdPath = path.resolve(sourceMdPathArg || paths.mermaidExtractPath);
+const imagesDir = path.resolve(
+  imagesDirArg || (ext === "png" ? paths.pngDir : paths.attachmentsDir)
+);
 const prefixRegex = new RegExp(`^${prefixArg}-\\d+\\.${ext}$`, "i");
 
 if (!fs.existsSync(sourceMdPath)) {

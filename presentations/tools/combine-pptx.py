@@ -4,7 +4,7 @@
 Reads a **deck note** (``<deck> Deck.md`` in the vault). The note's **deck manifest**
 table defines final slide order and source tags (``S1…Sn`` from Markdown sources,
 ``H1…Hm`` from PowerPoint sources, etc.). Frontmatter lists those sources under
-``markdown_sources`` and ``pptx_sources``.
+``deck_sources`` (each entry: ``file``, ``prefix``, ``type``, ``path``).
 
 The first listed PowerPoint source *is* the output's starting point. Markdown slides
 are generated into that file; PowerPoint-sourced slides get chrome stamped from the
@@ -30,8 +30,8 @@ b2p = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(b2p)
 
 TOKEN_RE = re.compile(r"^(S\d+|[A-Z]+\d+)$")
-BUILD_DIR = Path(__file__).resolve().parent.parent / "build"
-VAULT_NOTES = Path(__file__).resolve().parent.parent.parent / "vault" / "Notes"
+REPO_ROOT = Path(__file__).resolve().parent.parent.parent
+BUILD_DIR = REPO_ROOT / "presentations" / "build"
 
 
 def parse_frontmatter(path):
@@ -49,106 +49,105 @@ def parse_frontmatter(path):
     return data if isinstance(data, dict) else {}
 
 
-def _normalize_source(entry, source_count, default_prefix, property_name):
-    """Return ``{file, prefix}`` for one source-list entry."""
-    if isinstance(entry, str):
-        file_stem = entry.strip()
-        if not file_stem:
-            b2p.fail(f"{property_name} entries must not be empty strings.")
-        prefix = default_prefix if source_count == 1 else None
-        if prefix is None:
-            b2p.fail(
-                f"Multiple {property_name} require an explicit prefix per entry "
-                f"(e.g. `- file: …` / `prefix: …`)."
-            )
-        return {"file": file_stem, "prefix": prefix}
-
-    if isinstance(entry, dict):
-        file_stem = (entry.get("file") or entry.get("stem") or "").strip()
-        if not file_stem:
-            b2p.fail(f"Each {property_name} entry needs a file stem (file: …).")
-        prefix = (entry.get("prefix") or "").strip().upper()
-        if not prefix:
-            if source_count == 1:
-                prefix = default_prefix
-            else:
-                b2p.fail(
-                    f"{property_name} entry '{file_stem}' needs an explicit prefix "
-                    f"when multiple sources are declared."
-                )
-        if not re.fullmatch(r"[A-Z]+", prefix):
-            b2p.fail(f"{property_name} prefix must be uppercase letters (got {prefix!r}).")
-        return {"file": file_stem, "prefix": prefix}
-
-    b2p.fail(
-        f"{property_name} entries must be a file stem string or a mapping "
-        f"with file and optional prefix."
-    )
-
-
-def _parse_sources(manifest_path, key, default_prefix, required=True, legacy_key=None):
-    fm = parse_frontmatter(manifest_path)
-    raw = fm.get(key)
-    if raw is None and legacy_key and fm.get(legacy_key):
-        raw = [fm[legacy_key]]
-    if not raw:
-        if not required:
-            return []
+def _normalize_source(entry):
+    """Return ``{file, prefix, type, path?}`` for one ``deck_sources`` entry."""
+    if not isinstance(entry, dict):
         b2p.fail(
-            f"No '{key}' in frontmatter of {manifest_path} — declare sources, e.g.\n"
-            f"  {key}:\n"
-            f"    - file: ORAM Company Pitch\n"
-            f"      prefix: {default_prefix}"
+            "deck_sources entries must be mappings with file, prefix, type, and path, e.g.\n"
+            "  - file: ORAM Software Slides\n"
+            "    prefix: S\n"
+            "    type: marp\n"
+            "    path: vault/Notes/ORAM Software Slides.marp.md"
+        )
+
+    file_stem = (entry.get("file") or entry.get("stem") or "").strip()
+    if not file_stem:
+        b2p.fail("Each deck_sources entry needs file: …")
+
+    prefix = (entry.get("prefix") or "").strip().upper()
+    if not prefix or not re.fullmatch(r"[A-Z]+", prefix):
+        b2p.fail(f"deck_sources prefix must be uppercase letters (got {prefix!r}).")
+
+    path_val = (entry.get("path") or "").strip()
+    type_val = (entry.get("type") or "").strip().lower()
+    if not type_val and path_val:
+        lower = path_val.lower()
+        if lower.endswith(".marp.md"):
+            type_val = "marp"
+        elif lower.endswith(".pptx"):
+            type_val = "pptx"
+    if type_val not in ("marp", "pptx"):
+        b2p.fail(
+            f"deck_sources entry '{file_stem}' needs type: marp or pptx "
+            f"(or a .marp.md / .pptx path)."
+        )
+
+    out = {"file": file_stem, "prefix": prefix, "type": type_val}
+    if path_val:
+        out["path"] = path_val
+    return out
+
+
+def parse_deck_sources(manifest_path):
+    """Deck sources declared in manifest frontmatter."""
+    fm = parse_frontmatter(manifest_path)
+    raw = fm.get("deck_sources")
+    if not raw:
+        b2p.fail(
+            f"No 'deck_sources' in frontmatter of {manifest_path} — declare inputs, e.g.\n"
+            f"  deck_sources:\n"
+            f"    - file: ORAM Software Slides\n"
+            f"      prefix: S\n"
+            f"      type: marp\n"
+            f"      path: vault/Notes/ORAM Software Slides.marp.md\n"
+            f"    - file: ORAM Hardware Slides\n"
+            f"      prefix: H\n"
+            f"      type: pptx\n"
+            f"      path: presentations/build/ORAM Hardware Slides.pptx"
         )
     if isinstance(raw, str):
         raw = [raw]
     if not isinstance(raw, list) or not raw:
-        b2p.fail(f"{key} in {manifest_path} must be a non-empty list.")
+        b2p.fail(f"deck_sources in {manifest_path} must be a non-empty list.")
 
-    sources = [_normalize_source(entry, len(raw), default_prefix, key) for entry in raw]
+    sources = [_normalize_source(entry) for entry in raw]
     prefixes = [s["prefix"] for s in sources]
     if len(set(prefixes)) != len(prefixes):
-        b2p.fail(f"Duplicate {key} prefixes in {manifest_path}: {prefixes}")
+        b2p.fail(f"Duplicate deck_sources prefixes in {manifest_path}: {prefixes}")
     return sources
 
 
-def parse_markdown_sources(manifest_path):
-    """Marp slide sources declared in manifest frontmatter."""
-    return _parse_sources(manifest_path, "markdown_sources", "S")
+def resolve_source_path(path_str, default_repo_relative=None):
+    """Resolve a deck source path.
+
+    - Absolute paths and ``~`` are used as-is (after expanduser).
+    - Relative paths are resolved from the repository root.
+    - When ``path_str`` is empty, ``default_repo_relative`` is used the same way.
+    """
+    raw = (path_str or "").strip() or (default_repo_relative or "").strip()
+    if not raw:
+        return None
+    p = Path(raw).expanduser()
+    if not p.is_absolute():
+        p = REPO_ROOT / p
+    return p
 
 
-def parse_pptx_sources(manifest_path):
-    """External ``.pptx`` sources declared in manifest frontmatter."""
-    return _parse_sources(
-        manifest_path, "pptx_sources", "H", legacy_key="hwbase"
-    )
-
-
-def resolve_markdown_sources(manifest_path):
-    """Resolve ``vault/Notes/<file>.marp.md`` for each declared markdown source."""
+def resolve_sources(manifest_path):
+    """Resolve every ``deck_sources`` entry to an absolute path."""
     resolved = []
-    for src in parse_markdown_sources(manifest_path):
-        marp_path = VAULT_NOTES / f"{src['file']}.marp.md"
-        if not marp_path.exists():
+    for src in parse_deck_sources(manifest_path):
+        if src["type"] == "marp":
+            default = f"vault/Notes/{src['file']}.marp.md"
+        else:
+            default = f"presentations/build/{src['file']}.pptx"
+        path = resolve_source_path(src.get("path"), default)
+        if not path.is_file():
             b2p.fail(
-                f"Marp source not found: {marp_path} "
-                f"(markdown_sources in {manifest_path})"
+                f"Source not found: {path} "
+                f"(deck_sources → {src['file']}, type={src['type']} in {manifest_path})"
             )
-        resolved.append({**src, "path": marp_path})
-    return resolved
-
-
-def resolve_pptx_sources(manifest_path):
-    """Resolve ``presentations/build/<file>.pptx`` for each declared source."""
-    resolved = []
-    for src in parse_pptx_sources(manifest_path):
-        base_path = BUILD_DIR / f"{src['file']}.pptx"
-        if not base_path.exists():
-            b2p.fail(
-                f"External slide deck not found: {base_path} "
-                f"(pptx_sources in {manifest_path})"
-            )
-        resolved.append({**src, "path": base_path})
+        resolved.append({**src, "path": path})
     return resolved
 
 
@@ -263,23 +262,29 @@ def parse_manifest(path):
 
 
 def combine(brief_path, png_dir, out_path, manifest_path, theme_path=None):
+    b2p.load_layout()
     if theme_path:
         b2p.load_theme(theme_path)
 
-    md_sources = resolve_markdown_sources(manifest_path)
-    pptx_sources = resolve_pptx_sources(manifest_path)
+    all_sources = resolve_sources(manifest_path)
+    md_sources = [s for s in all_sources if s["type"] == "marp"]
+    pptx_sources = [s for s in all_sources if s["type"] == "pptx"]
 
     if len(md_sources) > 1:
         b2p.fail(
-            "Multiple markdown_sources are declared but combine currently supports "
+            "Multiple marp sources are declared but combine currently supports "
             "one Marp deck — use a single entry until multi-source merge is implemented."
         )
     if len(pptx_sources) > 1:
         b2p.fail(
-            "Multiple pptx_sources are declared but combine currently supports "
+            "Multiple pptx sources are declared but combine currently supports "
             "one external deck — use a single entry until multi-source merge "
             "is implemented."
         )
+    if not md_sources:
+        b2p.fail(f"No marp source in deck_sources (manifest {manifest_path}).")
+    if not pptx_sources:
+        b2p.fail(f"No pptx source in deck_sources (manifest {manifest_path}).")
 
     md = md_sources[0]
     md_prefix = md["prefix"]
@@ -304,8 +309,7 @@ def combine(brief_path, png_dir, out_path, manifest_path, theme_path=None):
         if prefix and prefix not in all_prefixes:
             b2p.fail(
                 f"Deck manifest tag {tag} uses prefix {prefix} but no matching entry "
-                f"in markdown_sources or pptx_sources "
-                f"(declared: {sorted(all_prefixes)})."
+                f"in deck_sources (declared prefixes: {sorted(all_prefixes)})."
             )
         if tag not in spine:
             b2p.fail(f"Source tag {tag} missing from deck manifest in {manifest_path}.")

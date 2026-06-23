@@ -1,0 +1,42 @@
+{
+  "name": "oram-light",
+  "colors": {
+    "background": "#ffffff",
+    "ink": "#1a1a1a",
+    "accent": "#4a6fa5",
+    "takeawayFill": "#e8eef6",
+    "takeawayText": "#1a1a1a"
+  },
+  "chrome": {
+    "showKicker": true,
+    "showSlideNumber": true,
+    "showTakeawayBand": true
+  },
+  "mermaid": {
+    "themeVariables": {
+      "darkMode": false,
+      "background": "#00000000",
+      "primaryColor": "#b6ad9b",
+      "primaryBorderColor": "#70685c",
+      "primaryTextColor": "#111111",
+      "secondaryColor": "#c4bcab",
+      "secondaryBorderColor": "#857d71",
+      "secondaryTextColor": "#111111",
+      "tertiaryColor": "#d2ccbf",
+      "tertiaryBorderColor": "#999182",
+      "tertiaryTextColor": "#111111",
+      "lineColor": "#111111",
+      "textColor": "#111111",
+      "mainBkg": "#b6ad9b",
+      "clusterPadding": 0,
+      "clusterBkg": "#d2ccbf",
+      "clusterBorder": "#999182",
+      "defaultLinkColor": "#111111",
+      "edgeLabelBackground": "#d2ccbf",
+      "nodeTextColor": "#111111"
+    }
+  },
+  "pdf": {
+    "marpTheme": "oram-light"
+  }
+}

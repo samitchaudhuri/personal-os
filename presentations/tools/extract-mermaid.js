@@ -8,29 +8,12 @@ function fail(message) {
   process.exit(1);
 }
 
-const [, , inputPath, outputPath] = process.argv;
-
-if (!inputPath || !outputPath) {
-  fail(
-    "Expected input and output paths. Example: node tools/extract-mermaid.js slides/slides.marp.md slides/slides.mermaid.md"
-  );
-}
-
-const themeDir = path.join(__dirname, "..", "mermaid-themes");
-
-function loadTheme(themeName) {
-  const themePath = path.join(themeDir, `${themeName}.json`);
-
-  if (!fs.existsSync(themePath)) {
-    fail(`Theme file not found: ${themePath}`);
-  }
-
-  try {
-    return JSON.parse(fs.readFileSync(themePath, "utf8"));
-  } catch (err) {
-    fail(`Failed to parse theme JSON at ${themePath}: ${err.message}`);
-  }
-}
+const {
+  loadOramTheme,
+  resolveThemeName,
+  toMermaidConfig,
+} = require("./load-oram-theme");
+const { resolveDeckPaths } = require("./resolve-deck-sources");
 
 function toYaml(value, indent = 0) {
   const pad = " ".repeat(indent);
@@ -86,25 +69,16 @@ function toYaml(value, indent = 0) {
   return String(value);
 }
 
-function makeFrontmatter(themeObject) {
-  return `---\nconfig:\n${toYaml(themeObject, 2)}\n---`;
+const paths = resolveDeckPaths();
+const inputPath = path.resolve(process.argv[2] || paths.marpPath);
+const outputPath = path.resolve(process.argv[3] || paths.mermaidExtractPath);
+
+if (!fs.existsSync(inputPath)) {
+  fail(`Input Marp file not found: ${inputPath}`);
 }
 
-function extractMarpTheme(inputText) {
-  const frontmatterMatch = inputText.match(/^---\n([\s\S]*?)\n---/);
-
-  if (!frontmatterMatch) {
-    fail("No Marp frontmatter found. Expected a top-level --- block with theme: <name>.");
-  }
-
-  const frontmatter = frontmatterMatch[1];
-  const themeMatch = frontmatter.match(/^theme:\s*"?([A-Za-z0-9_-]+)"?\s*$/m);
-
-  if (!themeMatch) {
-    fail("No global Marp theme found. Expected `theme: gaia` or similar in frontmatter.");
-  }
-
-  return themeMatch[1];
+function makeFrontmatter(themeObject) {
+  return `---\nconfig:\n${toYaml(themeObject, 2)}\n---`;
 }
 
 function extractDiagramId(body, index) {
@@ -126,8 +100,19 @@ function stripPerDiagramTheme(body) {
 }
 
 const inputText = fs.readFileSync(inputPath, "utf8");
-const themeName = extractMarpTheme(inputText);
-const theme = loadTheme(themeName);
+
+if (!inputText.match(/^---\n[\s\S]*?\n---/)) {
+  fail("No Marp frontmatter found. Expected a top-level --- block.");
+}
+
+let variant;
+try {
+  variant = resolveThemeName();
+} catch (err) {
+  fail(err.message);
+}
+
+const theme = toMermaidConfig(loadOramTheme(variant));
 const frontmatter = makeFrontmatter(theme);
 
 const mermaidFenceRegex = /```mermaid\s*\n([\s\S]*?)```/g;
@@ -164,6 +149,6 @@ fs.mkdirSync(path.dirname(outputPath), { recursive: true });
 fs.writeFileSync(outputPath, outputText, "utf8");
 
 console.log(
-  `Extracted ${diagrams.length} Mermaid diagram(s) from ${inputPath} using theme '${themeName}'.`
+  `Extracted ${diagrams.length} Mermaid diagram(s) from ${inputPath} using theme '${variant}'.`
 );
 console.log(`Wrote ${outputPath}.`);

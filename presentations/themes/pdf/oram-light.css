@@ -1,0 +1,167 @@
+/* @theme oram-light */
+@import 'gaia';
+
+/* ORAM PDF layout — from themes/oram-common.json */
+
+.mermaid {
+  margin: 0.08em 0 0.1em;
+}
+
+section {
+  font-family: "Helvetica Neue", Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 24px;
+  line-height: 1.22;
+  text-align: left;
+  display: block;
+  place-content: normal;
+  justify-content: flex-start;
+  align-items: stretch;
+  box-sizing: border-box;
+  padding-bottom: 115.19999999999999px;
+}
+
+header,
+footer {
+  display: none !important;
+}
+
+section img {
+  flex-shrink: 0;
+  max-height: 260px;
+  max-width: 100%;
+  height: auto;
+  width: auto;
+  display: block;
+  margin: 0.08em auto 0.1em;
+}
+
+span.label {
+  display: block;
+  font-size: 0.55em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin-bottom: 0.35em;
+}
+
+.takeaway {
+  position: absolute;
+  bottom: 40px;
+  left: 60px;
+  right: 60px;
+  font-size: 0.9em;
+  padding: 0.45em 0.65em;
+  border-radius: 4px;
+}
+
+section::before,
+section::after {
+  display: none !important;
+}
+
+h1 {
+  font-size: 1.45em;
+  margin: 0 0 0.08em;
+  padding: 0;
+  border: 0;
+}
+
+h2 {
+  font-size: 1.2em;
+  margin: 0 0 0.2em;
+}
+
+h3 {
+  font-size: 1.05em;
+  margin: 0 0 0.15em;
+}
+
+blockquote {
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
+}
+
+p,
+ul,
+ol {
+  margin-top: 0.2em;
+  margin-bottom: 0.2em;
+}
+
+li {
+  margin: 0.025em 0;
+}
+
+ol > li > p,
+ul > li > p {
+  margin: 0.025em 0;
+}
+
+section > *:first-child {
+  margin-top: 0;
+}
+
+section > *:last-child {
+  margin-bottom: 0;
+}
+
+.cols {
+  display: flex;
+  gap: 28px;
+  align-items: flex-start;
+}
+
+.col-left {
+  flex: 0 0 42%;
+}
+
+.col-right {
+  flex: 1;
+}
+
+.col-left .mermaid {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.col-right ul {
+  margin-top: 0.15em;
+  margin-bottom: 0.35em;
+}
+
+.col-right li {
+  margin: 0.05em 0;
+}
+
+
+section {
+  background-color: #ffffff;
+  background-image: none;
+  color: #1a1a1a;
+}
+
+span.label {
+  color: #4a6fa5;
+}
+
+.takeaway {
+  background-color: #e8eef6;
+  color: #1a1a1a;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: #1a1a1a;
+}
+
+a {
+  color: #4a6fa5;
+}
+
+em {
+  color: #4a6fa5;
+}

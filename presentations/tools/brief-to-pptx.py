@@ -10,11 +10,13 @@ SVG), so render PNGs first and pass their directory.
 Usage:
   brief-to-pptx.py "<brief.md>" "<png-dir>" "<out.pptx>" ["<palette.json>"]
 
-The optional theme JSON themes the slide chrome (parallel to the Mermaid theme
-that themes the diagrams). Recognized keys: font, background, ink, accent,
-takeawayFill, takeawayText, showKicker, showSlideNumber, showTakeawayBand, and
-sizes (title/kicker/body/heading/takeaway/number). Missing keys fall back to the
-built-in defaults below, so older 4-color palettes still work.
+Layout (margins, gaps, diagram cap, PPTX type spacing) comes from
+``themes/oram-common.json`` via ``load_layout()``. The optional palette JSON
+themes slide chrome — colors, font, chrome toggles, and point sizes — parallel
+to the Mermaid theme that themes the diagrams. Recognized palette keys: font,
+background, ink, accent, takeawayFill, takeawayText, showKicker, showSlideNumber,
+showTakeawayBand, and sizes (title/kicker/body/heading/takeaway/number). Missing
+keys fall back to the built-in defaults below, so older 4-color palettes still work.
 """
 
 import json
@@ -23,16 +25,17 @@ import struct
 import sys
 from pathlib import Path
 
+from reportlab.pdfbase.pdfmetrics import stringWidth
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE, MSO_SHAPE_TYPE
 from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
 from pptx.util import Emu, Inches, Pt
 
-# Theme defaults (matches the deck's restrained blue accent on white). Every key
-# is overridable via a pptx-themes/<name>.json file; see load_theme(). The whole
-# chrome — colors, font, background, which elements show, and type sizes — is
-# theme-driven so the deck can switch light/dark by pointing at another file.
+THEMES_DIR = Path(__file__).resolve().parent.parent / "themes"
+DEFAULT_COMMON_PATH = THEMES_DIR / "oram-common.json"
+
+# Palette defaults (light ORAM). Colors/font/toggles/sizes overridden by palette JSON.
 ACCENT = RGBColor(0x4A, 0x6F, 0xA5)
 INK = RGBColor(0x1A, 0x1A, 0x1A)
 TAKEAWAY_FILL = RGBColor(0xE8, 0xEE, 0xF6)
@@ -43,6 +46,56 @@ SHOW_KICKER = True
 SHOW_SLIDE_NUMBER = True
 SHOW_TAKEAWAY_BAND = True
 SIZES = {"title": 28, "kicker": 13, "body": 16, "heading": 17, "takeaway": 15, "number": 13}
+
+# Layout defaults mirror themes/oram-common.json until load_layout() runs.
+SLIDE_W = Inches(13.333)
+SLIDE_H = Inches(7.5)
+MARGIN = Inches(0.7)
+CONTENT_W = SLIDE_W - 2 * MARGIN
+CHROME_TOP = Inches(0.4)
+KICKER_H = Inches(0.2)
+GAP_AFTER_KICKER = Inches(0.06)
+GAP_AFTER_TITLE = Inches(0.05)
+GAP_AFTER_DIAGRAM = Inches(0.08)
+TAKEAWAY_BOTTOM = Inches(0.35)
+TAKEAWAY_BAND_H = Inches(0.85)
+TAKEAWAY_TEXT_INSET = Inches(0.2)
+MAX_DIAGRAM_H = Inches(260 / 96)
+DIAGRAM_MAX_ZONE_FRACTION = 0.42
+BODY_LINE_SPACING = 1.15
+
+
+def load_layout(common_path=None):
+    """Load variant-agnostic layout from themes/oram-common.json."""
+    global SLIDE_W, SLIDE_H, MARGIN, CONTENT_W, CHROME_TOP, KICKER_H
+    global GAP_AFTER_KICKER, GAP_AFTER_TITLE, GAP_AFTER_DIAGRAM, TAKEAWAY_BOTTOM
+    global TAKEAWAY_BAND_H, TAKEAWAY_TEXT_INSET, MAX_DIAGRAM_H, BODY_LINE_SPACING
+    global DIAGRAM_MAX_ZONE_FRACTION
+
+    path = Path(common_path) if common_path else DEFAULT_COMMON_PATH
+    if not path.is_file():
+        fail(f"ORAM common theme not found: {path}")
+
+    data = json.loads(path.read_text(encoding="utf-8"))
+    slide = data["slide"]
+    layout = data["layout"]
+    pptx = data["typography"]["pptx"]
+
+    SLIDE_W = Inches(slide["widthIn"])
+    SLIDE_H = Inches(slide["heightIn"])
+    MARGIN = Inches(layout["marginIn"])
+    CONTENT_W = SLIDE_W - 2 * MARGIN
+    CHROME_TOP = Inches(layout["chromeTopIn"])
+    KICKER_H = Inches(layout["kickerHeightIn"])
+    GAP_AFTER_KICKER = Inches(layout["gapAfterKickerIn"])
+    GAP_AFTER_TITLE = Inches(layout["gapAfterTitleIn"])
+    GAP_AFTER_DIAGRAM = Inches(layout["gapAfterDiagramIn"])
+    TAKEAWAY_BOTTOM = Inches(layout["takeawayBottomIn"])
+    TAKEAWAY_BAND_H = Inches(layout["takeawayBandHeightIn"])
+    MAX_DIAGRAM_H = Inches(layout["diagramMaxHeightPx"] / 96)
+    BODY_LINE_SPACING = float(pptx["bodyLineSpacing"])
+    TAKEAWAY_TEXT_INSET = Inches(pptx["takeawayTextInsetIn"])
+    DIAGRAM_MAX_ZONE_FRACTION = float(layout.get("diagramMaxZoneFraction", 0.42))
 
 
 def load_theme(path):
@@ -74,26 +127,52 @@ def load_theme(path):
     if isinstance(sizes, dict):
         SIZES = {**SIZES, **{k: int(v) for k, v in sizes.items() if v}}
 
-SLIDE_W = Inches(13.333)
-SLIDE_H = Inches(7.5)
-MARGIN = Inches(0.7)
-CONTENT_W = SLIDE_W - 2 * MARGIN
 
-# Vertical chrome — tuned to match Marp PDF (tight h1→diagram gap, 300px diagram cap).
-CHROME_TOP = Inches(0.4)
-KICKER_H = Inches(0.2)
-GAP_AFTER_KICKER = Inches(0.06)
-GAP_AFTER_TITLE = Inches(0.1)
-GAP_AFTER_DIAGRAM = Inches(0.12)
-TAKEAWAY_BOTTOM = Inches(0.35)
-MAX_DIAGRAM_H = Inches(300 / 96)  # ``section img { max-height: 300px }`` in the deck CSS
+def _emu_inches(emu):
+    return emu / 914400
+
+
+def _content_width_pt():
+    return _emu_inches(CONTENT_W) * 72
+
+
+def _title_metrics_font():
+    """ReportLab AFM face for bold title measurement (Helvetica Neue proxy)."""
+    return "Helvetica-Bold"
+
+
+def _title_line_count(title, font_pt, max_width_pt, metrics_font):
+    """Count wrapped lines using font metrics (not character heuristics)."""
+    text = title.strip()
+    if not text:
+        return 1
+
+    lines = 1
+    current = ""
+    for word in text.split():
+        candidate = f"{current} {word}".strip() if current else word
+        if stringWidth(candidate, metrics_font, font_pt) <= max_width_pt:
+            current = candidate
+            continue
+        if current:
+            lines += 1
+            current = word
+        else:
+            lines += 1
+            current = ""
+    return lines
 
 
 def _title_box_height(title):
-    """Estimate title textbox height from line count at the theme title size."""
-    line_h_in = SIZES["title"] / 72 * 1.3
-    chars_per_line = 44
-    lines = max(1, -(-len(title) // chars_per_line))
+    """Estimate title textbox height from wrapped line count at the theme title size."""
+    font_pt = SIZES["title"]
+    line_h_in = font_pt / 72 * 1.3
+    lines = _title_line_count(
+        title,
+        font_pt,
+        _content_width_pt(),
+        _title_metrics_font(),
+    )
     return Inches(line_h_in * lines + 0.04)
 
 
@@ -188,7 +267,7 @@ def set_body(tf, body):
         para = tf.paragraphs[0] if first else tf.add_paragraph()
         first = False
         para.level = 0
-        para.line_spacing = 1.15  # between Marp ``line-height: 1.22`` and single-spaced
+        para.line_spacing = BODY_LINE_SPACING
         if heading:
             para.space_before = Pt(4)
             para.space_after = Pt(3)
@@ -535,7 +614,7 @@ def render_slide(prs, blank, s, number, png_dir):
 
     # Vertical budget: content lives between `top` and the takeaway band.
     show_takeaway = bool(s["takeaway"]) and SHOW_TAKEAWAY_BAND
-    takeaway_h = Inches(0.85) if show_takeaway else Inches(0.0)
+    takeaway_h = TAKEAWAY_BAND_H if show_takeaway else Inches(0.0)
     zone_top = top
     zone_bottom = Emu(SLIDE_H - TAKEAWAY_BOTTOM - takeaway_h)
     zone_h = zone_bottom - zone_top
@@ -548,7 +627,7 @@ def render_slide(prs, blank, s, number, png_dir):
             fail(f"Diagram PNG not found: {png}")
         pw, ph = png_size(png)
         ratio = pw / ph
-        max_h = min(int(zone_h * 0.55), int(MAX_DIAGRAM_H))
+        max_h = min(int(zone_h * DIAGRAM_MAX_ZONE_FRACTION), int(MAX_DIAGRAM_H))
         w = CONTENT_W
         h = int(CONTENT_W / ratio)
         if h > max_h:
@@ -578,8 +657,8 @@ def render_slide(prs, blank, s, number, png_dir):
         tf.word_wrap = True
         tf.auto_size = MSO_AUTO_SIZE.NONE
         tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-        tf.margin_left = Inches(0.2)
-        tf.margin_right = Inches(0.2)
+        tf.margin_left = TAKEAWAY_TEXT_INSET
+        tf.margin_right = TAKEAWAY_TEXT_INSET
         p = tf.paragraphs[0]
         p.alignment = PP_ALIGN.LEFT
         lead = p.add_run()
@@ -597,7 +676,8 @@ def render_slide(prs, blank, s, number, png_dir):
     return slide
 
 
-def build(brief_path, png_dir, out_path, theme_path=None):
+def build(brief_path, png_dir, out_path, theme_path=None, common_path=None):
+    load_layout(common_path)
     if theme_path:
         load_theme(theme_path)
     text = Path(brief_path).read_text(encoding="utf-8")
