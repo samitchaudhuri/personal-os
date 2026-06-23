@@ -29,10 +29,10 @@ Slide sources (Marp markdown, PowerPoint, deck manifests) belong in the vault. T
 
 Open the file you are working on, then run the matching VS Code task:
 
-| Open | Task family | Output |
+| Open | Task | Output |
 | --- | --- | --- |
-| `<deck> Deck.md` | **deck active file** (PDF, PPTX, **combine**) | `build/<deck>.*` |
-| `.marp.md` | **Marp active file** (PDF, PPTX — software half only) | `build/<marp-stem>.*` |
+| `<deck> Deck.md` | **Slides: Build PDF** / **PPTX** / **Combined PPTX** | `build/<deck>.*` |
+| `.marp.md` | **Slides: Build PDF** / **PPTX** | `build/<marp-stem>.*` |
 
 Combine requires the **deck note** open — not the Marp file alone.
 

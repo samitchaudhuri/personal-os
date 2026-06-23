@@ -29,14 +29,18 @@ MARP_INPUT="../vault/Notes/ORAM Software Slides.marp.md" node tools/resolve-deck
 
 ## VS Code tasks (`.vscode/tasks.json`)
 
-| Task | Sets | Runs |
-| --- | --- | --- |
-| Slides: Build PDF/PPTX/PPT brief **(deck active file)** | `DECK_NOTE="${file}"` | `build-slides` / `build-pptx` / `build-ppt` |
-| Slides: Build PDF/PPTX/PPT brief **(Marp active file)** | `MARP_INPUT="${file}"` | same |
-| Slides: Build Combined PPTX **(deck active file)** | `DECK_NOTE="${file}"` | `build-combined` |
-| Slides: Build * (CLI) | — | Requires `DECK_NOTE` or `MARP_INPUT` in shell |
+All build tasks use `tools/run-active-file.js`: pass `${file}`, set `DECK_NOTE` or `MARP_INPUT` from the filename, then run the npm script.
 
-Combine is blocked in marp mode (`run-deck-python.js` → `requireDeckMode`).
+| Task | Open file | Runs |
+| --- | --- | --- |
+| Slides: Build PDF | `.marp.md` or ` Deck.md` | `build-slides` |
+| Slides: Build PPTX | `.marp.md` or ` Deck.md` | `build-pptx` |
+| Slides: Build Combined PPTX | ` Deck.md` only | `build-combined` |
+| Slides: PPT brief + assets | `.marp.md` or ` Deck.md` | `build-ppt` |
+| Slides: Extract Mermaid | `.marp.md` or ` Deck.md` | `slides:extract` |
+| Slides: Finish (MEP fallback) | `.marp.md` or ` Deck.md` | `slides:finish` |
+
+Combine is blocked for `.marp.md` in `run-active-file.js` (`--deck-only`) and in `run-deck-python.js` (`requireDeckMode`).
 
 ---
 

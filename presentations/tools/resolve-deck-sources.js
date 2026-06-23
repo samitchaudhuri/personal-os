@@ -191,14 +191,14 @@ function resolveDeckPaths() {
 
   fail(
     "Set DECK_NOTE (path to <deck> Deck.md) or MARP_INPUT (path to .marp.md). " +
-      "Open the source file and run an active-file task."
+      "Open the source file and run a Slides: Build… VS Code task."
   );
 }
 
 function requireDeckMode(paths, action) {
   if (paths.buildMode !== "deck") {
     fail(
-      `${action} requires a deck note. Open <deck> Deck.md and run the deck active-file task.`
+      `${action} requires a deck note. Open <deck> Deck.md and run Slides: Build Combined PPTX.`
     );
   }
 }

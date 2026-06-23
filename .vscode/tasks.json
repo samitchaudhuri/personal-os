@@ -2,89 +2,42 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Slides: Build PDF (CLI - mmdc)",
+      "label": "Slides: Build PDF",
       "type": "shell",
-      "command": "npm --prefix presentations run build-slides",
+      "command": "node presentations/tools/run-active-file.js build-slides \"${file}\"",
       "group": "build",
       "problemMatcher": []
     },
     {
       "label": "Slides: Build PPTX",
       "type": "shell",
-      "command": "npm --prefix presentations run build-pptx",
+      "command": "node presentations/tools/run-active-file.js build-pptx \"${file}\"",
       "group": "build",
       "problemMatcher": []
     },
     {
-      "label": "Slides: Build PPTX (Marp active file)",
+      "label": "Slides: Build Combined PPTX",
       "type": "shell",
-      "command": "MARP_INPUT=\"${file}\" npm --prefix presentations run build-pptx",
+      "command": "node presentations/tools/run-active-file.js build-combined \"${file}\" --deck-only",
       "group": "build",
       "problemMatcher": []
     },
     {
-      "label": "Slides: Build PPTX (deck active file)",
+      "label": "Slides: PPT brief + assets",
       "type": "shell",
-      "command": "DECK_NOTE=\"${file}\" npm --prefix presentations run build-pptx",
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "Slides: Build Combined PPTX (HW + SW)",
-      "type": "shell",
-      "command": "npm --prefix presentations run build-combined",
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "Slides: Build Combined PPTX (deck active file)",
-      "type": "shell",
-      "command": "DECK_NOTE=\"${file}\" npm --prefix presentations run build-combined",
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "Slides: Build PDF (Marp active file)",
-      "type": "shell",
-      "command": "MARP_INPUT=\"${file}\" npm --prefix presentations run build-slides",
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "Slides: Build PDF (deck active file)",
-      "type": "shell",
-      "command": "DECK_NOTE=\"${file}\" npm --prefix presentations run build-slides",
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "Slides: PPT brief + assets (Claude route)",
-      "type": "shell",
-      "command": "npm --prefix presentations run build-ppt",
-      "problemMatcher": []
-    },
-    {
-      "label": "Slides: PPT brief + assets (Marp active file)",
-      "type": "shell",
-      "command": "MARP_INPUT=\"${file}\" npm --prefix presentations run build-ppt",
-      "problemMatcher": []
-    },
-    {
-      "label": "Slides: PPT brief + assets (deck active file)",
-      "type": "shell",
-      "command": "DECK_NOTE=\"${file}\" npm --prefix presentations run build-ppt",
+      "command": "node presentations/tools/run-active-file.js build-ppt \"${file}\"",
       "problemMatcher": []
     },
     {
       "label": "Slides: Extract Mermaid",
       "type": "shell",
-      "command": "npm --prefix presentations run slides:extract",
+      "command": "node presentations/tools/run-active-file.js slides:extract \"${file}\"",
       "problemMatcher": []
     },
     {
       "label": "Slides: Finish (MEP fallback)",
       "type": "shell",
-      "command": "npm --prefix presentations run slides:rename && npm --prefix presentations run slides:replace && npm --prefix presentations run slides:pdf",
+      "command": "node presentations/tools/run-active-file.js slides:finish \"${file}\"",
       "problemMatcher": []
     }
   ]
