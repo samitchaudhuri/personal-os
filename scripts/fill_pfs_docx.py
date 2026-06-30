@@ -88,6 +88,25 @@ def run_xml(text: str) -> str:
     )
 
 
+def run_xml_bold(text: str) -> str:
+    """Header line run — matches template (bold, 9pt / w:sz 18 half-points)."""
+    space_attr = ""
+    if text and (text[0] == " " or text[-1] == " "):
+        space_attr = ' xml:space="preserve"'
+    return (
+        f'<w:r><w:rPr><w:b/><w:sz w:val="18"/></w:rPr>'
+        f"<w:t{space_attr}>{escape(str(text))}</w:t></w:r>"
+    )
+
+
+def run_xml_bold_tab_then_text(after_tab: str) -> str:
+    """Single run with Word tab stop then text (template date-line pattern)."""
+    return (
+        f'<w:r><w:rPr><w:b/><w:sz w:val="18"/></w:rPr>'
+        f"<w:tab/><w:t>{escape(after_tab)}</w:t></w:r>"
+    )
+
+
 def insert_run_by_paraid(xml: str, para_id: str, text) -> str:
     if text is None or text == "":
         return xml
@@ -112,10 +131,11 @@ def fix_date_paragraph(xml: str, date_str: str) -> str:
         inner = m.group(2)
         ppr = re.search(r"(<w:pPr>.*?</w:pPr>)", inner, re.DOTALL)
         ppr_xml = ppr.group(1) if ppr else ""
+        # Match template: title | [tab] Date: | date value (bold; w:tab not literal \t)
         runs = (
-            run_xml("Personal Financial Statement")
-            + run_xml("\t")
-            + run_xml(f"Date: {date_str}")
+            run_xml_bold("Personal Financial Statement")
+            + run_xml_bold_tab_then_text("Date:")
+            + run_xml_bold(f" {date_str}")
         )
         return m.group(1) + ppr_xml + runs + m.group(3)
 
