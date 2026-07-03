@@ -1,0 +1,44 @@
+# Site-selection build config (lever 2). Tunables + paths only.
+# This file is the authoritative home for the model's tunable numbers.
+# The vault Rules registry ([[Site Selection Scoring]]) explains each rule and
+# cites this file for the exact value; it does not restate the numbers.
+
+# Data lives in Google Drive (L1 PDFs + manual_facts.csv + combined_facts.csv).
+# Code + this config live in git (personal-os). Override drive_base per machine.
+drive_base: "/Users/samit/Library/CloudStorage/GoogleDrive-samit.chaudhuri@gmail.com/My Drive/Work/Franchise/Ultimate Longevity/Development/Site Selection/Candidates"
+comparison_dir: "_comparison"
+manual_file: "manual_facts.csv"
+output_file: "combined_facts.csv"
+
+# Gate + signal thresholds (see Rules registry for rationale).
+thresholds:
+  income_3mi_min: 150000        # S-income
+  pop_3mi_min: 100000           # S-pop
+  age_3mi_min: 40               # S-age
+  afford_ceiling_hard: 12500    # G-afford: pass if all-in <= this
+  afford_comfortable: 10000     # informational "comfortable" band (reports)
+  afford_borderline_pct: 0.10   # borderline if within this % over the hard ceiling; else fail
+
+# Local composite weights (must sum to 1.0).
+weights:
+  neighbor: 0.30
+  customer: 0.25
+  resid: 0.25
+  visibility: 0.20
+
+placer:
+  weekend_spike_ratio: 1.3      # ratio above this => "weekend-spike", else "uniform"
+
+# Ring read priority for demographics (primary first).
+ring_priority: ["3mi", "5mi", "1mi"]
+
+# Curated display names keyed by folder slug (VT Overview headers vary, so we
+# don't trust them for the canonical site name).
+site_names:
+  camden-park: "Camden Park"
+  el-gato-village: "El Gato Village"
+  walnut-grove: "Walnut Grove"
+  "1034-monroe": "1034 Monroe"
+  the-platform: "The Platform"
+  sc-square: "SC Square"
+  the-clara: "The Clara"
