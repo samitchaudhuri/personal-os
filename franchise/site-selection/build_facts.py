@@ -103,32 +103,50 @@ def fmt(v):
     return str(v)
 
 
-def read_overview(path):
-    """Parse `_page.md` for the VT web AI score (lease econ comes from manual)."""
+REPORT_FIELDS = [
+    "ai_report_score", "pop_1mi", "pop_3mi", "pop_5mi", "hh_3mi",
+    "med_income_1mi", "med_income_3mi", "med_income_5mi", "avg_income_3mi",
+    "med_age_3mi", "age_25_49_3mi", "age_50_64_3mi", "age_65plus_3mi",
+    "pct_income_150k_3mi", "cagr_hist_3mi", "cagr_proj_3mi", "daytime_3mi",
+    "fitness_centers_3mi",
+]
+
+
+def parse_overview_text(text):
+    """Pure: extract the VT web AI score from Overview text (testable without a file)."""
     out = {"ai_score": None}
-    if not path or not os.path.exists(path):
-        return out
-    with open(path, encoding="utf-8") as f:
-        text = f.read()
-    m = re.search(r"VT AI Score:\s*(\d+)", text)
+    m = re.search(r"VT AI Score:\s*(\d+)", text or "")
     if m:
         out["ai_score"] = int(m.group(1))
     return out
 
 
-def read_site_report(path):
-    """Parse the Site Report PDF ring table into demographics + report AI score."""
-    out = {k: None for k in [
-        "ai_report_score", "pop_1mi", "pop_3mi", "pop_5mi", "hh_3mi",
-        "med_income_1mi", "med_income_3mi", "med_income_5mi", "avg_income_3mi",
-        "med_age_3mi", "age_25_49_3mi", "age_50_64_3mi", "age_65plus_3mi",
-        "pct_income_150k_3mi", "cagr_hist_3mi", "cagr_proj_3mi", "daytime_3mi",
-        "fitness_centers_3mi",
-    ]}
+def read_overview(path):
+    """Read `_page.md` and parse it (lease econ comes from manual, not here)."""
     if not path or not os.path.exists(path):
-        return out
+        return parse_overview_text("")
+    with open(path, encoding="utf-8") as f:
+        return parse_overview_text(f.read())
+
+
+def read_site_report(path):
+    """Open the Site Report PDF and parse its text (empty/missing -> all None)."""
+    if not path or not os.path.exists(path):
+        return parse_report_text("")
     with pdfplumber.open(path) as doc:
         text = "\n".join((p.extract_text() or "") for p in doc.pages)
+    return parse_report_text(text)
+
+
+def parse_report_text(text):
+    """Pure: parse Site Report ring-table text into demographics + AI score.
+
+    Kept file-free so tests can feed a captured text fixture. Empty text yields
+    an all-None dict (every field becomes TODO downstream).
+    """
+    out = {k: None for k in REPORT_FIELDS}
+    if not text:
+        return out
 
     pop = ring_row(text, "Population")
     inc = ring_row(text, "Median Income")

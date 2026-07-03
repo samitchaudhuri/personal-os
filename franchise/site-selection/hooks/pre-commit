@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Hard gate: if a commit touches the site-selection tool, its tests must pass.
+# Tracked in-repo and installed into .git/hooks via hooks/install.sh.
+# Bypass (discouraged): git commit --no-verify
+set -uo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+TOOL_DIR="$REPO_ROOT/franchise/site-selection"
+
+# Only act when the tool's files are part of this commit.
+if ! git diff --cached --name-only | grep -q '^franchise/site-selection/'; then
+  exit 0
+fi
+
+echo "pre-commit: site-selection changed -> running tests"
+PY="$TOOL_DIR/.venv/bin/python"
+if [ ! -x "$PY" ]; then
+  PY="$(command -v python3 || true)"
+fi
+if [ -z "$PY" ]; then
+  echo "pre-commit: no python found to run tests. Set up .venv or use --no-verify to bypass." >&2
+  exit 1
+fi
+
+if ! ( cd "$TOOL_DIR" && "$PY" -m unittest discover -s tests ); then
+  echo "pre-commit: site-selection tests FAILED — commit blocked. Fix them (or bypass with --no-verify)." >&2
+  exit 1
+fi
+echo "pre-commit: site-selection tests passed."
+exit 0

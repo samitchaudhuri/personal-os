@@ -1,3 +1,7 @@
 .venv/
 __pycache__/
 *.pyc
+
+# This tool's tests are its executable spec and MUST be tracked, overriding the
+# repo-wide `test_*.py` ignore (root .gitignore). Do not remove.
+!tests/test_*.py
