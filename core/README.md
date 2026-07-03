@@ -29,10 +29,11 @@ touch BACKLOG.md
 
 ### 2. Configure
 
-Copy `templates/AGENTS.md` to your root and customize:
-- Categories for your workflow
-- Priority definitions
-- Personal goals (optional)
+**Note:** `core/templates/` was removed 2026-07-02. See [archive/upstream-bootstrap-templates.md](./archive/upstream-bootstrap-templates.md) to restore upstream bootstrap files from git.
+
+This fork uses a vault-centric setup:
+- Symlink root `AGENTS.md` → `vault/Agent/Agents.md`
+- Read `vault/README.md` for vault conventions
 
 ### 3. Start MCP Server
 

@@ -15,8 +15,8 @@
 # │                                                                     │
 # │ 1. CREATE WORKSPACE STRUCTURE                                       │
 # │    - Ensure these directories exist: Tasks/, Knowledge/             │
-# │    - If AGENTS.md doesn't exist, copy from core/templates/AGENTS.md │
-# │    - If .gitignore doesn't exist, copy from core/templates/gitignore│
+# │    - core/templates/ removed 2026-07-02 (see core/archive/)         │
+# │    - If AGENTS.md missing: symlink to vault/Agent/Agents.md         │
 # │    - If BACKLOG.md doesn't exist, create it with a short intro      │
 # │                                                                     │
 # │ 2. ASK THE USER THESE 5 QUESTIONS (use AskUserQuestion if you      │
@@ -128,19 +128,21 @@ for dir in "Tasks" "Knowledge"; do
     fi
 done
 
-# Copy template files
-print_header "Setting Up Templates"
+# Bootstrap templates (deprecated)
+print_header "Agent Instructions"
 
-if [ ! -f "AGENTS.md" ] && [ -f "core/templates/AGENTS.md" ]; then
-    cp "core/templates/AGENTS.md" "AGENTS.md"
-    print_success "Copied: AGENTS.md"
+print_info "DEPRECATED: core/templates/ removed 2026-07-02."
+print_info "See core/archive/upstream-bootstrap-templates.md to restore from git."
+print_info "This fork expects AGENTS.md -> vault/Agent/Agents.md (see vault/README.md)."
+
+if [ ! -f "AGENTS.md" ]; then
+    print_info "AGENTS.md missing — create a symlink to your vault Agent/Agents.md"
 else
-    print_info "File exists: AGENTS.md (preserving your version)"
+    print_success "Found: AGENTS.md"
 fi
 
-if [ ! -f ".gitignore" ] && [ -f "core/templates/gitignore" ]; then
-    cp "core/templates/gitignore" ".gitignore"
-    print_success "Copied: .gitignore"
+if [ ! -f ".gitignore" ]; then
+    print_info ".gitignore missing — add one for your environment"
 else
     print_info "File exists: .gitignore (preserving your version)"
 fi

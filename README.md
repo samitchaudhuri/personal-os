@@ -85,13 +85,10 @@ personal-os/
 ├── AGENTS.md               # AI agent instructions (symlinks inside vault)
 ├── Knowledge/              # Legacy - prefer Obsidian Notes/
 ├── core/                   # Reusable system components (public)
+│   ├── archive/            # Retired upstream docs (e.g. bootstrap templates)
 │   ├── evals/              # Session evaluations
 │   ├── mcp/                # MCP server implementation
 │   │   └── server.py       # Core server with deduplication
-│   ├── templates/          # Template files for users
-│   │   ├── AGENTS.md       # Comprehensive AI instruction template
-│   │   ├── config.yaml     # Configuration template
-│   │   └── gitignore       # Gitignore template
 │   └── README.md           # Core system documentation
 └── setup.sh                # Interactive setup script
 
