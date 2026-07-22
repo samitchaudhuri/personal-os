@@ -9,13 +9,16 @@
     "marginIn": 0.7,
     "chromeTopIn": 0.4,
     "kickerHeightIn": 0.2,
-    "gapAfterKickerIn": 0.06,
-    "gapAfterTitleIn": 0.05,
+    "gapAfterKickerIn": 0.12,
+    "gapAfterTitleIn": 0.14,
     "gapAfterDiagramIn": 0.08,
+    "titleLineHeight": 1.3,
+    "titleBoxPadIn": 0.04,
     "takeawayBottomIn": 0.35,
     "takeawayBandHeightIn": 0.85,
-    "diagramMaxHeightPx": 260,
+    "diagramMaxHeightPx": 320,
     "diagramMaxZoneFraction": 0.42,
+    "bodyHeightPadIn": 0.2,
     "lineHeight": 1.22
   },
   "typography": {
@@ -26,15 +29,9 @@
         "h2": 1.2,
         "h3": 1.05
       },
-      "labelScale": 0.55,
       "labelLetterSpacingEm": 0.06,
       "takeawayScale": 0.9,
-      "takeawayPaddingEm": 0.45,
-      "takeawayBottomPx": 40,
-      "takeawayInsetPx": 60,
-      "gapAfterTitleEm": 0.08,
-      "diagramMarginTopEm": 0.08,
-      "diagramMarginBottomEm": 0.1
+      "takeawayPaddingEm": 0.45
     },
     "pptx": {
       "title": 26,

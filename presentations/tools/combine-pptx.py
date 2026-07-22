@@ -7,9 +7,9 @@ table defines final slide order and source tags (``S1…Sn`` from Markdown sourc
 ``deck_sources`` (each entry: ``file``, ``prefix``, ``type``, ``path``).
 
 The first listed PowerPoint source *is* the output's starting point. Markdown slides
-are generated into that file; PowerPoint-sourced slides get chrome stamped from the
-deck manifest; Markdown slide chrome is validated against it. Then slide order is
-rearranged to match the manifest.
+are generated into that file; PowerPoint-sourced slides get the themed slide
+background and chrome stamped from the deck manifest; Markdown slide chrome is
+validated against it. Then slide order is rearranged to match the manifest.
 
 Usage:
   combine-pptx.py "<brief.md>" "<png-dir>" "<out.pptx>" "<deck-note.md>" ["<theme.json>"]
@@ -359,9 +359,10 @@ def combine(brief_path, png_dir, out_path, manifest_path, theme_path=None):
         final_pos = order.index(tag) + 1
         slide = prs.slides[k]
         row = spine[tag]
-        if not b2p.update_slide_number(slide, final_pos):
-            missing_chrome.append(f"{tag} (number)")
-        for field in b2p.stamp_pptx_slide_chrome(slide, row):
+        fields = b2p.apply_slide_chrome(
+            slide, row, number=final_pos, mode="stamp"
+        )
+        for field in fields:
             missing_chrome.append(f"{tag} ({field})")
     if missing_chrome:
         b2p.fail(

@@ -9,6 +9,7 @@ const fs = require("fs");
 const path = require("path");
 
 const { loadOramTheme } = require("./load-oram-theme");
+const { renderLayoutCss } = require("./marp-pdf-theme-render");
 
 const ROOT = path.join(__dirname, "..");
 const COMMON_PATH = path.join(ROOT, "themes", "oram-common.json");
@@ -20,13 +21,16 @@ const BRIEF_TO_PPTX = {
     marginIn: 0.7,
     chromeTopIn: 0.4,
     kickerHeightIn: 0.2,
-    gapAfterKickerIn: 0.06,
-    gapAfterTitleIn: 0.05,
+    gapAfterKickerIn: 0.12,
+    gapAfterTitleIn: 0.14,
     gapAfterDiagramIn: 0.08,
+    titleLineHeight: 1.3,
+    titleBoxPadIn: 0.04,
     takeawayBottomIn: 0.35,
     takeawayBandHeightIn: 0.85,
-    diagramMaxHeightPx: 260,
+    diagramMaxHeightPx: 320,
     diagramMaxZoneFraction: 0.42,
+    bodyHeightPadIn: 0.2,
   },
   font: "Helvetica Neue",
   typography: {
@@ -47,26 +51,25 @@ const BRIEF_TO_PPTX = {
 const MARP_STYLE = {
   layout: {
     lineHeight: 1.22,
-    diagramMaxHeightPx: 260,
+    diagramMaxHeightPx: 320,
     diagramMaxZoneFraction: 0.42,
   },
   typography: {
     marp: {
       bodyPx: 24,
       headings: { h1: 1.45, h2: 1.2, h3: 1.05 },
-      labelScale: 0.55,
       labelLetterSpacingEm: 0.06,
       takeawayScale: 0.9,
       takeawayPaddingEm: 0.45,
-      takeawayBottomPx: 40,
-      takeawayInsetPx: 60,
-      gapAfterTitleEm: 0.08,
-      diagramMarginTopEm: 0.08,
-      diagramMarginBottomEm: 0.1,
     },
   },
   columns: { gapPx: 28, leftPercent: 42 },
 };
+
+/** Title→diagram and diagram→body gaps come from layout.*In via marp-pdf-theme-render. */
+function expectedMarpGapPx(inches, slide) {
+  return inches * (720 / slide.heightIn);
+}
 
 function readJson(filePath) {
   return JSON.parse(fs.readFileSync(filePath, "utf8"));
@@ -113,10 +116,13 @@ function checkCommonVsPptx(common) {
       gapAfterKickerIn: common.layout.gapAfterKickerIn,
       gapAfterTitleIn: common.layout.gapAfterTitleIn,
       gapAfterDiagramIn: common.layout.gapAfterDiagramIn,
+      titleLineHeight: common.layout.titleLineHeight,
+      titleBoxPadIn: common.layout.titleBoxPadIn,
       takeawayBottomIn: common.layout.takeawayBottomIn,
       takeawayBandHeightIn: common.layout.takeawayBandHeightIn,
       diagramMaxHeightPx: common.layout.diagramMaxHeightPx,
       diagramMaxZoneFraction: common.layout.diagramMaxZoneFraction,
+      bodyHeightPadIn: common.layout.bodyHeightPadIn,
     },
     BRIEF_TO_PPTX.layout
   );
@@ -147,6 +153,69 @@ function checkCommonVsMarp(common) {
   assertEqual("common.columns ↔ marp CSS", common.columns, MARP_STYLE.columns);
 }
 
+function checkMarpLayoutMatchesPptx(common) {
+  const slice = {
+    font: common.font,
+    slide: common.slide,
+    layout: common.layout,
+    typography: common.typography,
+    columns: common.columns,
+  };
+  const css = renderLayoutCss(slice, "oram-light");
+  const px = (inches) =>
+    Math.round(expectedMarpGapPx(inches, common.slide));
+
+  function assertCssIncludes(label, needle) {
+    if (!css.includes(needle)) {
+      console.error(`FAIL ${label}: expected ${JSON.stringify(needle)}`);
+      process.exitCode = 1;
+      return;
+    }
+    console.log(`ok ${label}`);
+  }
+
+  assertCssIncludes(
+    "marp section top ↔ layout.chromeTopIn",
+    `padding-top: ${px(common.layout.chromeTopIn)}px;`
+  );
+  assertCssIncludes(
+    "marp kicker height ↔ layout.kickerHeightIn",
+    `min-height: ${px(common.layout.kickerHeightIn)}px;`
+  );
+  assertCssIncludes(
+    "marp kicker gap ↔ layout.gapAfterKickerIn",
+    `margin-bottom: ${px(common.layout.gapAfterKickerIn)}px;`
+  );
+  assertCssIncludes(
+    "marp label size ↔ typography.pptx.kicker",
+    `font-size: ${common.typography.pptx.kicker / common.typography.marp.bodyPx}em;`
+  );
+  assertCssIncludes(
+    "marp h1 line-height ↔ layout.titleLineHeight",
+    `line-height: ${common.layout.titleLineHeight};`
+  );
+  assertCssIncludes(
+    "marp h1 pad ↔ layout.titleBoxPadIn",
+    `padding: 0 0 ${px(common.layout.titleBoxPadIn)}px;`
+  );
+  assertCssIncludes(
+    "marp h1 gap ↔ layout.gapAfterTitleIn",
+    `margin: 0 0 ${px(common.layout.gapAfterTitleIn)}px;`
+  );
+  assertCssIncludes(
+    "marp diagram gap ↔ layout.gapAfterDiagramIn",
+    `margin: 0 0 ${px(common.layout.gapAfterDiagramIn)}px;`
+  );
+  assertCssIncludes(
+    "marp takeaway bottom ↔ layout.takeawayBottomIn",
+    `bottom: ${px(common.layout.takeawayBottomIn)}px;`
+  );
+  assertCssIncludes(
+    "marp takeaway inset ↔ layout.marginIn",
+    `left: ${px(common.layout.marginIn)}px;`
+  );
+}
+
 function checkVariantParity() {
   const light = pickSlice(loadOramTheme("oram-light"));
   const dark = pickSlice(loadOramTheme("oram-dark"));
@@ -157,6 +226,7 @@ const common = readJson(COMMON_PATH);
 
 checkCommonVsPptx(common);
 checkCommonVsMarp(common);
+checkMarpLayoutMatchesPptx(common);
 checkVariantParity();
 
 if (process.exitCode) {

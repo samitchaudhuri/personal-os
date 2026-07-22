@@ -10,6 +10,10 @@ function slidePxPerIn(slide) {
   return 720 / slide.heightIn;
 }
 
+function layoutInToPx(inches, slide) {
+  return Math.round(inches * slidePxPerIn(slide));
+}
+
 function renderLayoutCss(common, variant) {
   const m = common.typography.marp;
   const l = common.layout;
@@ -19,11 +23,21 @@ function renderLayoutCss(common, variant) {
     variant === "oram-dark" ? "\n  letter-spacing: normal;" : "";
   const contentPadBottom =
     (l.takeawayBottomIn + l.takeawayBandHeightIn) * slidePxPerIn(common.slide);
+  const gapAfterTitlePx = layoutInToPx(l.gapAfterTitleIn, common.slide);
+  const gapAfterDiagramPx = layoutInToPx(l.gapAfterDiagramIn, common.slide);
+  const gapAfterKickerPx = layoutInToPx(l.gapAfterKickerIn, common.slide);
+  const titleBoxPadPx = layoutInToPx(l.titleBoxPadIn ?? 0.04, common.slide);
+  const titleLineHeight = l.titleLineHeight ?? 1.3;
+  const chromeTopPx = layoutInToPx(l.chromeTopIn, common.slide);
+  const kickerHeightPx = layoutInToPx(l.kickerHeightIn, common.slide);
+  const takeawayBottomPx = layoutInToPx(l.takeawayBottomIn, common.slide);
+  const takeawayInsetPx = layoutInToPx(l.marginIn, common.slide);
+  const labelScale = common.typography.pptx.kicker / m.bodyPx;
 
-  return `/* ORAM PDF layout — from themes/oram-common.json */
+  return `/* ORAM PDF layout — from themes/oram-common.json (derived from PPTX layout tokens) */
 
 .mermaid {
-  margin: ${m.diagramMarginTopEm}em 0 ${m.diagramMarginBottomEm}em;
+  margin: 0 0 ${gapAfterDiagramPx}px;
 }
 
 section {
@@ -36,6 +50,7 @@ section {
   justify-content: flex-start;
   align-items: stretch;
   box-sizing: border-box;
+  padding-top: ${chromeTopPx}px;
   padding-bottom: ${contentPadBottom}px;${letterSpacing}
 }
 
@@ -51,23 +66,24 @@ section img {
   height: auto;
   width: auto;
   display: block;
-  margin: ${m.diagramMarginTopEm}em auto ${m.diagramMarginBottomEm}em;
+  margin: 0 auto ${gapAfterDiagramPx}px;
 }
 
 span.label {
   display: block;
-  font-size: ${m.labelScale}em;
+  font-size: ${labelScale}em;
   font-weight: 600;
   letter-spacing: ${m.labelLetterSpacingEm}em;
   text-transform: uppercase;
-  margin-bottom: 0.35em;
+  min-height: ${kickerHeightPx}px;
+  margin-bottom: ${gapAfterKickerPx}px;
 }
 
 .takeaway {
   position: absolute;
-  bottom: ${m.takeawayBottomPx}px;
-  left: ${m.takeawayInsetPx}px;
-  right: ${m.takeawayInsetPx}px;
+  bottom: ${takeawayBottomPx}px;
+  left: ${takeawayInsetPx}px;
+  right: ${takeawayInsetPx}px;
   font-size: ${m.takeawayScale}em;
   padding: ${m.takeawayPaddingEm}em 0.65em;
   border-radius: 4px;
@@ -80,8 +96,9 @@ section::after {
 
 h1 {
   font-size: ${h.h1}em;
-  margin: 0 0 ${m.gapAfterTitleEm}em;
-  padding: 0;
+  line-height: ${titleLineHeight};
+  margin: 0 0 ${gapAfterTitlePx}px;
+  padding: 0 0 ${titleBoxPadPx}px;
   border: 0;
 }
 
@@ -206,7 +223,9 @@ em {
 
 module.exports = {
   fontStack,
+  layoutInToPx,
   marpBaseImport,
   renderLayoutCss,
   renderVariantCss,
+  slidePxPerIn,
 };

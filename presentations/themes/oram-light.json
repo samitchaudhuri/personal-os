@@ -3,8 +3,8 @@
   "colors": {
     "background": "#ffffff",
     "ink": "#1a1a1a",
-    "accent": "#4a6fa5",
-    "takeawayFill": "#e8eef6",
+    "accent": "#9B5A3C",
+    "takeawayFill": "#F5EBE4",
     "takeawayText": "#1a1a1a"
   },
   "chrome": {
@@ -16,24 +16,24 @@
     "themeVariables": {
       "darkMode": false,
       "background": "#00000000",
-      "primaryColor": "#b6ad9b",
-      "primaryBorderColor": "#70685c",
-      "primaryTextColor": "#111111",
-      "secondaryColor": "#c4bcab",
-      "secondaryBorderColor": "#857d71",
-      "secondaryTextColor": "#111111",
-      "tertiaryColor": "#d2ccbf",
-      "tertiaryBorderColor": "#999182",
-      "tertiaryTextColor": "#111111",
-      "lineColor": "#111111",
-      "textColor": "#111111",
-      "mainBkg": "#b6ad9b",
+      "primaryColor": "#C9A88E",
+      "primaryBorderColor": "#8B6347",
+      "primaryTextColor": "#2A2420",
+      "secondaryColor": "#D9C4B0",
+      "secondaryBorderColor": "#9A7358",
+      "secondaryTextColor": "#2A2420",
+      "tertiaryColor": "#E8D5C4",
+      "tertiaryBorderColor": "#A8866A",
+      "tertiaryTextColor": "#2A2420",
+      "lineColor": "#2A2420",
+      "textColor": "#2A2420",
+      "mainBkg": "#C9A88E",
       "clusterPadding": 0,
-      "clusterBkg": "#d2ccbf",
-      "clusterBorder": "#999182",
-      "defaultLinkColor": "#111111",
-      "edgeLabelBackground": "#d2ccbf",
-      "nodeTextColor": "#111111"
+      "clusterBkg": "#E8D5C4",
+      "clusterBorder": "#A8866A",
+      "defaultLinkColor": "#2A2420",
+      "edgeLabelBackground": "#E8D5C4",
+      "nodeTextColor": "#2A2420"
     }
   },
   "pdf": {

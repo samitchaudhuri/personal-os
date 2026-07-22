@@ -62,7 +62,10 @@ TAKEAWAY_BAND_H = Inches(0.85)
 TAKEAWAY_TEXT_INSET = Inches(0.2)
 MAX_DIAGRAM_H = Inches(260 / 96)
 DIAGRAM_MAX_ZONE_FRACTION = 0.42
+BODY_HEIGHT_PAD = Inches(0.2)
 BODY_LINE_SPACING = 1.15
+TITLE_LINE_HEIGHT = 1.3
+TITLE_BOX_PAD = Inches(0.04)
 
 
 def load_layout(common_path=None):
@@ -70,7 +73,7 @@ def load_layout(common_path=None):
     global SLIDE_W, SLIDE_H, MARGIN, CONTENT_W, CHROME_TOP, KICKER_H
     global GAP_AFTER_KICKER, GAP_AFTER_TITLE, GAP_AFTER_DIAGRAM, TAKEAWAY_BOTTOM
     global TAKEAWAY_BAND_H, TAKEAWAY_TEXT_INSET, MAX_DIAGRAM_H, BODY_LINE_SPACING
-    global DIAGRAM_MAX_ZONE_FRACTION
+    global DIAGRAM_MAX_ZONE_FRACTION, BODY_HEIGHT_PAD, TITLE_LINE_HEIGHT, TITLE_BOX_PAD
 
     path = Path(common_path) if common_path else DEFAULT_COMMON_PATH
     if not path.is_file():
@@ -96,6 +99,9 @@ def load_layout(common_path=None):
     BODY_LINE_SPACING = float(pptx["bodyLineSpacing"])
     TAKEAWAY_TEXT_INSET = Inches(pptx["takeawayTextInsetIn"])
     DIAGRAM_MAX_ZONE_FRACTION = float(layout.get("diagramMaxZoneFraction", 0.42))
+    BODY_HEIGHT_PAD = Inches(layout.get("bodyHeightPadIn", 0.2))
+    TITLE_LINE_HEIGHT = float(layout.get("titleLineHeight", 1.3))
+    TITLE_BOX_PAD = Inches(layout.get("titleBoxPadIn", 0.04))
 
 
 def load_theme(path):
@@ -166,14 +172,85 @@ def _title_line_count(title, font_pt, max_width_pt, metrics_font):
 def _title_box_height(title):
     """Estimate title textbox height from wrapped line count at the theme title size."""
     font_pt = SIZES["title"]
-    line_h_in = font_pt / 72 * 1.3
+    line_h_in = font_pt / 72 * TITLE_LINE_HEIGHT
     lines = _title_line_count(
         title,
         font_pt,
         _content_width_pt(),
         _title_metrics_font(),
     )
-    return Inches(line_h_in * lines + 0.04)
+    return Inches(line_h_in * lines + _emu_inches(TITLE_BOX_PAD))
+
+
+def _body_metrics_font():
+    return "Helvetica"
+
+
+def _plain_text_for_measure(text):
+    """Strip inline markdown so wrap measurement matches rendered text."""
+    return re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+
+
+def _body_box_height(body):
+    """Estimate body textbox height so diagram sizing can use leftover zone space."""
+    if not body or not body.strip():
+        return 0
+
+    body_pt = SIZES["body"]
+    heading_pt = SIZES["heading"]
+    max_w = _content_width_pt()
+    bullet_w = max_w - 14  # "•  " prefix in set_body
+
+    height_pt = 0.0
+    lines = [raw.rstrip() for raw in body.split("\n") if raw.strip()]
+    for i, line in enumerate(lines):
+        is_last = i == len(lines) - 1
+        heading = re.match(r"^#{1,6}\s+(.*)$", line)
+        if heading:
+            wrapped = _title_line_count(
+                _plain_text_for_measure(heading.group(1)),
+                heading_pt,
+                max_w,
+                _title_metrics_font(),
+            )
+            height_pt += 4 + wrapped * heading_pt * BODY_LINE_SPACING + 3
+        elif line.startswith("- "):
+            wrapped = _title_line_count(
+                _plain_text_for_measure(line[2:]),
+                body_pt,
+                bullet_w,
+                _body_metrics_font(),
+            )
+            height_pt += wrapped * body_pt * BODY_LINE_SPACING + (2 if not is_last else 3)
+        else:
+            wrapped = _title_line_count(
+                _plain_text_for_measure(line),
+                body_pt,
+                max_w,
+                _body_metrics_font(),
+            )
+            height_pt += wrapped * body_pt * BODY_LINE_SPACING + (3 if is_last else 2)
+
+    return Inches(height_pt / 72 + 0.04)
+
+
+def _body_reserve(body):
+    """Body zone height including safety pad so text does not spill into takeaway."""
+    if not body or not body.strip():
+        return 0
+    return int(_body_box_height(body)) + int(BODY_HEIGHT_PAD)
+
+
+def _diagram_max_height(zone_h, body=None):
+    """Cap diagram height from zone budget; grow into space left by short body text."""
+    zone = int(zone_h)
+    abs_max = int(MAX_DIAGRAM_H)
+    if body and body.strip():
+        reserved = _body_reserve(body) + int(GAP_AFTER_DIAGRAM)
+        available = max(0, zone - reserved)
+        return min(available, abs_max)
+    frac_cap = int(zone * DIAGRAM_MAX_ZONE_FRACTION)
+    return min(frac_cap, abs_max)
 
 
 def fail(msg):
@@ -355,6 +432,192 @@ def find_slide_number_shape(slide):
     return best
 
 
+def _clear_paragraph_runs(para):
+    for run in list(para.runs):
+        para._p.remove(run._r)
+
+
+def _fill_slide_number_text_frame(tf, number):
+    """Write slide number with theme accent (shared by render and stamp)."""
+    para = tf.paragraphs[0]
+    para.alignment = PP_ALIGN.RIGHT
+    _clear_paragraph_runs(para)
+    run = para.add_run()
+    run.text = str(number)
+    run.font.size = Pt(SIZES["number"])
+    run.font.bold = True
+    run.font.color.rgb = ACCENT
+    if FONT:
+        run.font.name = FONT
+    for extra in tf.paragraphs[1:]:
+        for run in extra.runs:
+            run.text = ""
+
+
+def _fill_kicker_text_frame(tf, role):
+    """Write narrative role / kicker with theme accent (shared by render and stamp)."""
+    tf.auto_size = MSO_AUTO_SIZE.NONE
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = Pt(0)
+    para = tf.paragraphs[0]
+    _clear_paragraph_runs(para)
+    run = para.add_run()
+    run.text = role.upper()
+    run.font.size = Pt(SIZES["kicker"])
+    run.font.bold = True
+    run.font.color.rgb = ACCENT
+    if FONT:
+        run.font.name = FONT
+
+
+def _fill_title_text_frame(tf, title):
+    """Write slide title with theme ink (shared by render and stamp)."""
+    tf.auto_size = MSO_AUTO_SIZE.NONE
+    tf.word_wrap = True
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = Pt(0)
+    para = tf.paragraphs[0]
+    _clear_paragraph_runs(para)
+    run = para.add_run()
+    run.text = title
+    run.font.size = Pt(SIZES["title"])
+    run.font.bold = True
+    run.font.color.rgb = INK
+    if FONT:
+        run.font.name = FONT
+
+
+def _apply_takeaway_band_style(shape):
+    """Match ``render_slide`` takeaway band fill and border on an existing shape."""
+    shape.fill.solid()
+    shape.fill.fore_color.rgb = TAKEAWAY_FILL
+    shape.line.fill.background()
+    shape.shadow.inherit = False
+
+
+def _fill_takeaway_text_frame(tf, takeaway):
+    """Write takeaway label + body with theme colors (shared by render and stamp)."""
+    tf.word_wrap = True
+    tf.auto_size = MSO_AUTO_SIZE.NONE
+    tf.vertical_anchor = MSO_ANCHOR.MIDDLE
+    tf.margin_left = TAKEAWAY_TEXT_INSET
+    tf.margin_right = TAKEAWAY_TEXT_INSET
+    para = tf.paragraphs[0]
+    para.alignment = PP_ALIGN.LEFT
+    _clear_paragraph_runs(para)
+    lead = para.add_run()
+    lead.text = "Takeaway:  "
+    lead.font.bold = True
+    lead.font.size = Pt(SIZES["takeaway"])
+    lead.font.color.rgb = ACCENT
+    if FONT:
+        lead.font.name = FONT
+    add_rich_text(para, takeaway, size=Pt(SIZES["takeaway"]), color=TAKEAWAY_TEXT)
+
+
+def _chrome_fields(chrome):
+    """Normalize brief or manifest chrome dict (``kicker`` vs ``role``)."""
+    if not chrome:
+        return {"role": None, "title": None, "takeaway": None}
+    return {
+        "role": chrome.get("role") or chrome.get("kicker"),
+        "title": chrome.get("title"),
+        "takeaway": chrome.get("takeaway"),
+    }
+
+
+def apply_slide_background(slide):
+    """Set slide canvas fill from the active theme (SW render + HW stamp)."""
+    slide.background.fill.solid()
+    slide.background.fill.fore_color.rgb = BACKGROUND
+
+
+def apply_slide_chrome(slide, chrome, *, number=None, top=None, mode="stamp"):
+    """Apply themed slide chrome from one entry point.
+
+    ``mode``:
+      - ``stamp`` — find existing shapes (HW combine); restyle + set text. Returns missing fields.
+      - ``create_header`` — add number/role/title shapes at ``top``; returns Emu below title.
+      - ``create_takeaway`` — add bottom takeaway band from ``chrome['takeaway']``.
+    """
+    fields = _chrome_fields(chrome)
+    missing = []
+
+    if mode == "stamp":
+        apply_slide_background(slide)
+
+        if number is not None and SHOW_SLIDE_NUMBER:
+            shape = find_slide_number_shape(slide)
+            if shape is None:
+                missing.append("number")
+            else:
+                _fill_slide_number_text_frame(shape.text_frame, number)
+
+        if fields["role"] and SHOW_KICKER:
+            shape = find_kicker_shape(slide)
+            if not shape:
+                missing.append("kicker/role")
+            else:
+                _fill_kicker_text_frame(shape.text_frame, fields["role"])
+
+        if fields["title"]:
+            shape = find_title_shape(slide)
+            if not shape:
+                missing.append("title")
+            else:
+                _fill_title_text_frame(shape.text_frame, fields["title"])
+
+        if fields["takeaway"] and SHOW_TAKEAWAY_BAND:
+            shape = find_takeaway_shape(slide)
+            if not shape:
+                missing.append("takeaway")
+            else:
+                _apply_takeaway_band_style(shape)
+                _fill_takeaway_text_frame(shape.text_frame, fields["takeaway"])
+                _bring_shape_to_front(shape)
+
+        return missing
+
+    if mode == "create_header":
+        if top is None:
+            fail("apply_slide_chrome(create_header) requires top=CHROME_TOP")
+
+        if number is not None and SHOW_SLIDE_NUMBER:
+            num_w = Inches(1.2)
+            nbox = slide.shapes.add_textbox(
+                Emu(SLIDE_W - MARGIN - num_w), top, num_w, KICKER_H
+            )
+            _fill_slide_number_text_frame(nbox.text_frame, number)
+
+        if fields["role"] and SHOW_KICKER:
+            box = slide.shapes.add_textbox(MARGIN, top, CONTENT_W, KICKER_H)
+            _fill_kicker_text_frame(box.text_frame, fields["role"])
+            top = Emu(top + KICKER_H + GAP_AFTER_KICKER)
+
+        if fields["title"]:
+            title_h = _title_box_height(fields["title"])
+            box = slide.shapes.add_textbox(MARGIN, top, CONTENT_W, title_h)
+            _fill_title_text_frame(box.text_frame, fields["title"])
+            top = Emu(top + title_h + GAP_AFTER_TITLE)
+
+        return top
+
+    if mode == "create_takeaway":
+        takeaway = fields["takeaway"]
+        if not takeaway or not SHOW_TAKEAWAY_BAND:
+            return None
+        band = slide.shapes.add_shape(
+            MSO_SHAPE.ROUNDED_RECTANGLE,
+            MARGIN,
+            Emu(SLIDE_H - TAKEAWAY_BOTTOM - TAKEAWAY_BAND_H),
+            CONTENT_W,
+            TAKEAWAY_BAND_H,
+        )
+        _apply_takeaway_band_style(band)
+        _fill_takeaway_text_frame(band.text_frame, takeaway)
+        return None
+
+    fail(f'apply_slide_chrome: unknown mode "{mode}"')
+
+
 def update_slide_number(slide, number):
     """Set the slide-number chrome text to ``number`` (combined-deck position)."""
     if not SHOW_SLIDE_NUMBER:
@@ -362,38 +625,7 @@ def update_slide_number(slide, number):
     shape = find_slide_number_shape(slide)
     if shape is None:
         return False
-    text = str(number)
-    tf = shape.text_frame
-    para = tf.paragraphs[0]
-    para.alignment = PP_ALIGN.RIGHT
-    if para.runs:
-        para.runs[0].text = text
-        for run in para.runs[1:]:
-            run.text = ""
-    else:
-        para.add_run().text = text
-    for extra in tf.paragraphs[1:]:
-        for run in extra.runs:
-            run.text = ""
-    return True
-
-
-def _set_shape_text(shape, text, uppercase=False):
-    """Replace a textbox with ``text``, preserving formatting on the first run."""
-    if not shape or not shape.has_text_frame:
-        return False
-    text = text.upper() if uppercase else text
-    tf = shape.text_frame
-    para = tf.paragraphs[0]
-    if para.runs:
-        para.runs[0].text = text
-        for run in para.runs[1:]:
-            run.text = ""
-    else:
-        para.text = text
-    for extra in tf.paragraphs[1:]:
-        for run in extra.runs:
-            run.text = ""
+    _fill_slide_number_text_frame(shape.text_frame, number)
     return True
 
 
@@ -450,32 +682,71 @@ def find_title_shape(slide):
     return best
 
 
+def _takeaway_band_top():
+    return int(SLIDE_H - TAKEAWAY_BOTTOM - TAKEAWAY_BAND_H)
+
+
+def _bring_shape_to_front(shape):
+    """Move a shape to the top of the slide z-order (covers overlapping diagram art)."""
+    el = shape._element
+    parent = el.getparent()
+    parent.remove(el)
+    parent.append(el)
+
+
 def find_takeaway_shape(slide):
-    """Bottom takeaway band (rounded rectangle or textbox)."""
+    """Bottom takeaway band (rounded rectangle or wide textbox).
+
+    HW source slides often contain diagram connector lines (zero-width AUTO_SHAPE)
+    below the real band; prefer labeled bands and ignore narrow slivers.
+    """
+    band_top = _takeaway_band_top()
     bottom_min = int(SLIDE_H * 0.62)
-    best = None
-    best_top = -1
+    min_width = int(CONTENT_W * 0.5)
+    min_height = int(TAKEAWAY_BAND_H * 0.4)
+    band_tol = int(Inches(0.25))
+    labeled = []
+    bands = []
     for shape in slide.shapes:
         if not shape.has_text_frame:
             continue
         if shape.top < bottom_min:
             continue
+        if shape.width < min_width or shape.height < min_height:
+            continue
         text = shape.text_frame.text.strip().lower()
-        if "takeaway" in text or shape.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE:
-            if shape.top > best_top:
-                best_top = shape.top
-                best = shape
-    return best
+        if "takeaway" in text:
+            labeled.append(shape)
+        elif shape.shape_type == MSO_SHAPE_TYPE.AUTO_SHAPE:
+            bands.append(shape)
+
+    def _band_score(shape):
+        in_band = 1 if abs(shape.top - band_top) <= band_tol else 0
+        return (in_band, shape.width, -abs(shape.top - band_top))
+
+    if labeled:
+        return max(labeled, key=_band_score)
+    if bands:
+        return max(bands, key=lambda s: (s.width, -abs(s.top - band_top)))
+    return None
 
 
 def update_slide_kicker(slide, role):
     if not SHOW_KICKER:
         return False
-    return _set_shape_text(find_kicker_shape(slide), role, uppercase=True)
+    shape = find_kicker_shape(slide)
+    if not shape:
+        return False
+    _fill_kicker_text_frame(shape.text_frame, role)
+    return True
 
 
 def update_slide_title(slide, title):
-    return _set_shape_text(find_title_shape(slide), title)
+    shape = find_title_shape(slide)
+    if not shape:
+        return False
+    _fill_title_text_frame(shape.text_frame, title)
+    return True
 
 
 def update_slide_takeaway(slide, takeaway):
@@ -484,26 +755,9 @@ def update_slide_takeaway(slide, takeaway):
     shape = find_takeaway_shape(slide)
     if not shape:
         return False
-    tf = shape.text_frame
-    para = tf.paragraphs[0]
-    para.alignment = PP_ALIGN.LEFT
-    if len(para.runs) >= 2:
-        para.runs[1].text = takeaway
-        for run in para.runs[2:]:
-            run.text = ""
-    elif para.runs:
-        if para.runs[0].text.strip().lower().startswith("takeaway"):
-            para.runs[0].text = "Takeaway:  "
-            if len(para.runs) == 1:
-                para.add_run()
-            para.runs[1].text = takeaway
-        else:
-            _set_shape_text(shape, f"Takeaway:  {takeaway}")
-    else:
-        lead = para.add_run()
-        lead.text = "Takeaway:  "
-        lead.font.bold = True
-        para.add_run().text = takeaway
+    _apply_takeaway_band_style(shape)
+    _fill_takeaway_text_frame(shape.text_frame, takeaway)
+    _bring_shape_to_front(shape)
     return True
 
 
@@ -538,16 +792,9 @@ def validate_markdown_chrome(tag, brief_slide, spine_row):
     return mismatches
 
 
-def stamp_pptx_slide_chrome(slide, spine_row):
-    """Write deck-manifest role/title/takeaway onto PowerPoint slide chrome. Returns missing fields."""
-    missing = []
-    if spine_row.get("role") and not update_slide_kicker(slide, spine_row["role"]):
-        missing.append("kicker/role")
-    if spine_row.get("title") and not update_slide_title(slide, spine_row["title"]):
-        missing.append("title")
-    if spine_row.get("takeaway") and not update_slide_takeaway(slide, spine_row["takeaway"]):
-        missing.append("takeaway")
-    return missing
+def stamp_pptx_slide_chrome(slide, spine_row, number=None):
+    """Write deck-manifest chrome onto PowerPoint slides. Returns missing fields."""
+    return apply_slide_chrome(slide, spine_row, number=number, mode="stamp")
 
 
 def render_slide(prs, blank, s, number, png_dir):
@@ -560,57 +807,11 @@ def render_slide(prs, blank, s, number, png_dir):
     slide = prs.slides.add_slide(blank)
     clear_slide_placeholders(slide)
 
-    # Slide background — lets a dark theme flip bg + ink together.
-    slide.background.fill.solid()
-    slide.background.fill.fore_color.rgb = BACKGROUND
+    apply_slide_background(slide)
 
-    top = CHROME_TOP
-
-    # Slide number, top-right, aligned with the kicker line.
-    if SHOW_SLIDE_NUMBER:
-        num_w = Inches(1.2)
-        nbox = slide.shapes.add_textbox(Emu(SLIDE_W - MARGIN - num_w), top, num_w, KICKER_H)
-        npara = nbox.text_frame.paragraphs[0]
-        npara.alignment = PP_ALIGN.RIGHT
-        nrun = npara.add_run()
-        nrun.text = str(number)
-        nrun.font.size = Pt(SIZES["number"])
-        nrun.font.bold = True
-        nrun.font.color.rgb = ACCENT
-        if FONT:
-            nrun.font.name = FONT
-
-    if s["kicker"] and SHOW_KICKER:
-        box = slide.shapes.add_textbox(MARGIN, top, CONTENT_W, KICKER_H)
-        tf = box.text_frame
-        tf.auto_size = MSO_AUTO_SIZE.NONE
-        tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = Pt(0)
-        p = tf.paragraphs[0]
-        r = p.add_run()
-        r.text = s["kicker"].upper()
-        r.font.size = Pt(SIZES["kicker"])
-        r.font.bold = True
-        r.font.color.rgb = ACCENT
-        if FONT:
-            r.font.name = FONT
-        top = Emu(top + KICKER_H + GAP_AFTER_KICKER)
-
-    if s["title"]:
-        title_h = _title_box_height(s["title"])
-        box = slide.shapes.add_textbox(MARGIN, top, CONTENT_W, title_h)
-        tf = box.text_frame
-        tf.auto_size = MSO_AUTO_SIZE.NONE
-        tf.word_wrap = True
-        tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = Pt(0)
-        p = tf.paragraphs[0]
-        r = p.add_run()
-        r.text = s["title"]
-        r.font.size = Pt(SIZES["title"])
-        r.font.bold = True
-        r.font.color.rgb = INK
-        if FONT:
-            r.font.name = FONT
-        top = Emu(top + title_h + GAP_AFTER_TITLE)
+    top = apply_slide_chrome(
+        slide, s, number=number, top=CHROME_TOP, mode="create_header"
+    )
 
     # Vertical budget: content lives between `top` and the takeaway band.
     show_takeaway = bool(s["takeaway"]) and SHOW_TAKEAWAY_BAND
@@ -627,7 +828,10 @@ def render_slide(prs, blank, s, number, png_dir):
             fail(f"Diagram PNG not found: {png}")
         pw, ph = png_size(png)
         ratio = pw / ph
-        max_h = min(int(zone_h * DIAGRAM_MAX_ZONE_FRACTION), int(MAX_DIAGRAM_H))
+        max_h = _diagram_max_height(zone_h, s.get("body"))
+        if s.get("body"):
+            body_cap = int(zone_h) - _body_reserve(s["body"]) - int(GAP_AFTER_DIAGRAM)
+            max_h = min(max_h, max(0, body_cap))
         w = CONTENT_W
         h = int(CONTENT_W / ratio)
         if h > max_h:
@@ -642,33 +846,7 @@ def render_slide(prs, blank, s, number, png_dir):
         set_body(box.text_frame, s["body"])
 
     if show_takeaway:
-        band = slide.shapes.add_shape(
-            MSO_SHAPE.ROUNDED_RECTANGLE,
-            MARGIN,
-            Emu(SLIDE_H - TAKEAWAY_BOTTOM - takeaway_h),
-            CONTENT_W,
-            takeaway_h,
-        )
-        band.fill.solid()
-        band.fill.fore_color.rgb = TAKEAWAY_FILL
-        band.line.fill.background()
-        band.shadow.inherit = False
-        tf = band.text_frame
-        tf.word_wrap = True
-        tf.auto_size = MSO_AUTO_SIZE.NONE
-        tf.vertical_anchor = MSO_ANCHOR.MIDDLE
-        tf.margin_left = TAKEAWAY_TEXT_INSET
-        tf.margin_right = TAKEAWAY_TEXT_INSET
-        p = tf.paragraphs[0]
-        p.alignment = PP_ALIGN.LEFT
-        lead = p.add_run()
-        lead.text = "Takeaway:  "
-        lead.font.bold = True
-        lead.font.size = Pt(SIZES["takeaway"])
-        lead.font.color.rgb = ACCENT
-        if FONT:
-            lead.font.name = FONT
-        add_rich_text(p, s["takeaway"], size=Pt(SIZES["takeaway"]), color=TAKEAWAY_TEXT)
+        apply_slide_chrome(slide, s, mode="create_takeaway")
 
     if s["notes"]:
         slide.notes_slide.notes_text_frame.text = s["notes"]

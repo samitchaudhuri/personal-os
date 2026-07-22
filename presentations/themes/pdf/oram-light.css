@@ -1,10 +1,10 @@
 /* @theme oram-light */
 @import 'gaia';
 
-/* ORAM PDF layout — from themes/oram-common.json */
+/* ORAM PDF layout — from themes/oram-common.json (derived from PPTX layout tokens) */
 
 .mermaid {
-  margin: 0.08em 0 0.1em;
+  margin: 0 0 8px;
 }
 
 section {
@@ -17,6 +17,7 @@ section {
   justify-content: flex-start;
   align-items: stretch;
   box-sizing: border-box;
+  padding-top: 38px;
   padding-bottom: 115.19999999999999px;
 }
 
@@ -27,28 +28,29 @@ footer {
 
 section img {
   flex-shrink: 0;
-  max-height: 260px;
+  max-height: 320px;
   max-width: 100%;
   height: auto;
   width: auto;
   display: block;
-  margin: 0.08em auto 0.1em;
+  margin: 0 auto 8px;
 }
 
 span.label {
   display: block;
-  font-size: 0.55em;
+  font-size: 0.5416666666666666em;
   font-weight: 600;
   letter-spacing: 0.06em;
   text-transform: uppercase;
-  margin-bottom: 0.35em;
+  min-height: 19px;
+  margin-bottom: 12px;
 }
 
 .takeaway {
   position: absolute;
-  bottom: 40px;
-  left: 60px;
-  right: 60px;
+  bottom: 34px;
+  left: 67px;
+  right: 67px;
   font-size: 0.9em;
   padding: 0.45em 0.65em;
   border-radius: 4px;
@@ -61,8 +63,9 @@ section::after {
 
 h1 {
   font-size: 1.45em;
-  margin: 0 0 0.08em;
-  padding: 0;
+  line-height: 1.3;
+  margin: 0 0 13px;
+  padding: 0 0 4px;
   border: 0;
 }
 
@@ -141,11 +144,11 @@ section {
 }
 
 span.label {
-  color: #4a6fa5;
+  color: #9B5A3C;
 }
 
 .takeaway {
-  background-color: #e8eef6;
+  background-color: #F5EBE4;
   color: #1a1a1a;
 }
 
@@ -159,9 +162,9 @@ h6 {
 }
 
 a {
-  color: #4a6fa5;
+  color: #9B5A3C;
 }
 
 em {
-  color: #4a6fa5;
+  color: #9B5A3C;
 }

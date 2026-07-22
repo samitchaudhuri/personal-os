@@ -99,7 +99,7 @@ write-pptx-theme.js
 run-deck-python.js        ← brief-to-pptx.py | combine-pptx.py
 run-child.js              ← spawn helper
 
-brief-to-pptx.py          ← local PPTX generator
+brief-to-pptx.py          ← local PPTX; apply_slide_chrome() for SW create + HW stamp
 combine-pptx.py           ← manifest-driven merge
 
 generate-marp-pdf-themes.js / marp-pdf-theme-render.js
@@ -193,5 +193,5 @@ presentations/
 
 - `build/` is regenerable; never commit outputs.
 - `slides:clean` removes transient `mmdc*.svg`; orphaned `<id>.svg` after diagram deletion → remove by hand from Attachments.
-- PPTX path does not read Marp CSS — layout comes from `oram-common.json` via Python `load_layout()`.
+- PPTX path does not read Marp CSS — layout comes from `oram-common.json` via Python `load_layout()`. **PPTX is canonical** for chrome geometry; Marp PDF CSS is generated from the same `layout.*In` tokens.
 - PDF layout CSS is inlined into `themes/pdf/*.css` (Marp does not resolve external `@import` in theme-set).

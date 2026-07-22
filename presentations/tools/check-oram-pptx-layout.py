@@ -54,6 +54,9 @@ def main():
         ("takeaway bottom", length_inches(b2p.TAKEAWAY_BOTTOM), layout["takeawayBottomIn"]),
         ("takeaway band height", length_inches(b2p.TAKEAWAY_BAND_H), layout["takeawayBandHeightIn"]),
         ("max diagram height", length_inches(b2p.MAX_DIAGRAM_H), layout["diagramMaxHeightPx"] / 96),
+        ("body height pad", length_inches(b2p.BODY_HEIGHT_PAD), layout["bodyHeightPadIn"]),
+        ("title line height", b2p.TITLE_LINE_HEIGHT, layout["titleLineHeight"]),
+        ("title box pad", length_inches(b2p.TITLE_BOX_PAD), layout["titleBoxPadIn"]),
         ("body line spacing", b2p.BODY_LINE_SPACING, pptx["bodyLineSpacing"]),
         ("takeaway text inset", length_inches(b2p.TAKEAWAY_TEXT_INSET), pptx["takeawayTextInsetIn"]),
         (

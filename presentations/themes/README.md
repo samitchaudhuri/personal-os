@@ -10,6 +10,8 @@ Author-facing commands: [`../README.md`](../README.md). Pipeline detail: [`../BU
 
 Slide appearance should not live in `.marp.md` as scattered CSS. Layout numbers and palette tokens live here as JSON; builds merge them at export time so PDF, PPTX, and diagrams stay aligned when you change one margin or accent color.
 
+**Layout authority:** PPTX (`brief-to-pptx.py`) is canonical for chrome geometry. Marp PDF CSS is generated from the same `oram-common.json` `layout.*In` tokens (`marp-pdf-theme-render.js`). If PDF and PPTX disagree, fix the shared layout or the generator — not the PPTX output.
+
 ---
 
 ## What you set in the vault
@@ -49,10 +51,10 @@ At PDF export, the build injects Marp CLI `theme: oram-light` on the **export md
 
 | Token | oram-light | oram-dark |
 | --- | --- | --- |
-| Background | `#ffffff` | `#0f1419` |
-| Ink | `#1a1a1a` | `#e8eaed` |
-| Accent | `#4a6fa5` | `#9db8e0` |
-| Takeaway fill | `#e8eef6` | `#1c2733` |
+| Background | `#ffffff` | `#141210` |
+| Ink | `#1a1a1a` | `#F0EBE6` |
+| Accent | `#9B5A3C` | `#E8A882` |
+| Takeaway fill | `#F5EBE4` | `#3D3228` |
 
 Layout (margins, type scale, diagram height cap) is **identical** across variants — see `oram-common.json`.
 
@@ -80,7 +82,7 @@ Inspect a merged theme: `npm run themes:show -- oram-light`.
 | Asset | PDF | PPTX | Combined `H#` slides |
 | --- | --- | --- | --- |
 | `oram-common.json` | layout | layout | chrome geometry |
-| `oram-light` / `oram-dark` | colors | colors | chrome colors |
+| `oram-light` / `oram-dark` | colors | colors | chrome colors + slide background |
 | `themes/pdf/*.css` | yes | no | no |
 | `.marp.md` body | content | via brief | `S#` content only |
 
