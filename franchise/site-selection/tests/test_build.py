@@ -98,13 +98,14 @@ class TestCompute(unittest.TestCase):
         return r
 
     def test_gate_boundaries(self):
-        # ceiling 12500, borderline within +10% -> 13750.
+        # ceiling 17000 (Don 7/8 NorCal), borderline within +10% -> 18700.
         cases = {
             10272: "pass",       # base 39 + nnn 16.08 @ 2238 SF (Camden)
-            12500: "pass",       # exactly at ceiling
-            13000: "borderline",
-            13750: "borderline",
-            14000: "fail",
+            13172: "pass",       # El Gato — was borderline under old $12.5K ceiling
+            17000: "pass",       # exactly at ceiling
+            17789: "borderline", # SC Square / Walnut asking
+            18700: "borderline",
+            19000: "fail",
         }
         for allin, expected in cases.items():
             # pick base/nnn/sf that yield this monthly all-in: (base+nnn)*sf/12 = allin

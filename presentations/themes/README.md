@@ -82,9 +82,11 @@ Inspect a merged theme: `npm run themes:show -- oram-light`.
 | Asset | PDF | PPTX | Combined `H#` slides |
 | --- | --- | --- | --- |
 | `oram-common.json` | layout | layout | chrome geometry |
-| `oram-light` / `oram-dark` | colors | colors | chrome colors + slide background |
+| `oram-light` / `oram-dark` | colors | colors | chrome colors + slide background (see below) |
 | `themes/pdf/*.css` | yes | no | no |
 | `.marp.md` body | content | via brief | `S#` content only |
+
+**Combined `H#` theming:** quick reference in [[Slide Deck Development#HW slide theming at combine]]; implementation in [`BUILD.md`](../BUILD.md#hw-slide-theming-at-combine).
 
 Marp CSS is never read by the PPTX generator.
 

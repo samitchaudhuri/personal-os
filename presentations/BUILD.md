@@ -2,6 +2,8 @@
 
 Reference for **commands, env vars, pipelines, and tools**. Slide authors normally use VS Code tasks (see [`README.md`](README.md)); this doc supports debugging and pipeline changes.
 
+**Maintainer:** When you add or change build behavior (scripts under `tools/`, npm tasks, env vars, theme application, HW combine/staging), update **this file** in the same change. When author-facing HW/combine **policy** changes, update [[Slide Deck Development#HW slide theming at combine]] in the same change — pointers only in [`themes/README.md`](themes/README.md), not a second copy of policy.
+
 ---
 
 ## Entry points
@@ -39,8 +41,44 @@ All build tasks use `tools/run-active-file.js`: pass `${file}`, set `DECK_NOTE` 
 | Slides: PPT brief + assets | `.marp.md` or ` Deck.md` | `build-ppt` |
 | Slides: Extract Mermaid | `.marp.md` or ` Deck.md` | `slides:extract` |
 | Slides: Finish (MEP fallback) | `.marp.md` or ` Deck.md` | `slides:finish` |
+| Slides: Sync HW slides | (any) | `slides:sync-hw` |
 
 Combine is blocked for `.marp.md` in `run-active-file.js` (`--deck-only`) and in `run-deck-python.js` (`requireDeckMode`).
+
+### Hardware slide staging
+
+Combined decks read HW PowerPoint from paths declared in deck note `deck_sources` (e.g. `project_repos/oram/docs/presentations/ORAM Hardware Slides.pptx`). Author workflow: [[Slide Deck Development#HW slide staging]].
+
+```bash
+cd presentations && npm run slides:sync-hw
+```
+
+VS Code task: **Slides: Sync HW slides**. Implementation: `tools/sync-hw-slides.js`. See `project_repos/oram/docs/presentations/README.md`.
+
+### HW slide theming at combine
+
+Author-facing policy and conventions: [[Slide Deck Development#HW slide theming at combine]]. This section adds implementation detail.
+
+When you build with `deck_theme: oram-dark` or `THEME=oram-dark`, combine stamps **PowerPoint-sourced** slides (`H#`) using tokens from `themes/oram-*.json` (via `build/*.pptx-theme.json`).
+
+| Element | Light / dark behavior |
+| --- | --- |
+| Slide canvas | Recolored to theme `background` |
+| Slide chrome (kicker, title, slide number, takeaway band) | Stamped from theme each build — edit manifest, not PowerPoint |
+| Text on transparent diagram labels | Recolored to `ink` |
+| Text on opaque badges / callouts | Recolored to `ink` when font is Automatic or theme default; explicit accent/RGB skipped |
+| Diagram strokes (black / automatic) | Recolored to `ink` when stroke already exists; borderless shapes unchanged |
+| Diagram fills and images | Left as authored |
+| HW tables | Fully themed: cell fills, text, and borders from `table.*` tokens |
+
+**Implementation** (`brief-to-pptx.py` → `apply_slide_chrome(..., mode="stamp")`, then transparent/opaque text recolor, `recolor_automatic_diagram_lines()`, and `recolor_table_shapes()`):
+**Tables:** row 0 and column 0 → `headerFill` + `headerText` (shared frame); data cells alternate `background` with `table.bandFill` per `table.stripe` (theme default) or deck note `table_stripe:` (per-tag map). All cell borders → `table.headerFill` (same as the header frame) via `tblBorders` on `tblPr` plus per-cell `tcPr`. Combine removes the staged `tableStyleId` (otherwise PowerPoint applies the deck default tx1 grid). Author staged `.pptx` with **no manual cell fills**.
+
+**Automatic text on opaque badges:** runs with no font color, or theme-default slots (`tx1`, `dk1`, `lt1`), get `ink`. Explicit RGB or accent scheme colors are skipped.
+
+**Automatic diagram strokes:** only shapes that already have a visible stroke get recolored: `solidFill` with theme-default scheme slots or light-mode defaults (`#000000`, `#1a1a1a`, `#2A2420`). Shapes with no stroke, `noFill`, or unset line color are left alone (combine does not add borders). Explicit accent or custom RGB strokes are skipped. Alpha on a default-black stroke is preserved. Groups recursed; chrome, tables, charts, and pictures skipped.
+
+Task tracker: `oram-deck-hw-diagram-colors` on ORAM Project (`vault/Notes/ORAM Project.md`).
 
 ---
 
@@ -72,6 +110,7 @@ Run from repo root: `npm --prefix presentations run <script>`, or from `presenta
 | `slides:write-pptx-theme` | `write-pptx-theme.js` | `build/<prefix>.pptx-theme.json` |
 | `slides:pptx` | `run-deck-python.js brief` | Local PPTX |
 | `slides:combine` | `run-deck-python.js combine` | Combined PPTX from deck manifest |
+| `slides:sync-hw` | `sync-hw-slides.js` | Drive → `oram` HW staging (manual) |
 | `slides:finish` | rename + replace + apply-pdf-theme + pdf | MEP fallback |
 | `themes:generate-pdf` | `generate-marp-pdf-themes.js` | Regenerate `themes/pdf/*.css` |
 | `themes:check` | `check-oram-theme.js` | JSON merge sanity |

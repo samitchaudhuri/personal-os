@@ -15,7 +15,8 @@ thresholds:
   income_3mi_min: 150000        # S-income
   pop_3mi_min: 100000           # S-pop
   age_3mi_min: 40               # S-age
-  afford_ceiling_hard: 12500    # G-afford: pass if all-in <= this
+  afford_ceiling_hard: 17000    # G-afford: pass if all-in <= this (Don 7/8 NorCal)
+  afford_preferred: 12500       # informational: model upside / preferred band (reports)
   afford_comfortable: 10000     # informational "comfortable" band (reports)
   afford_borderline_pct: 0.10   # borderline if within this % over the hard ceiling; else fail
 

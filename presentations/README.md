@@ -8,7 +8,42 @@ Build tooling for slide decks whose **content and manifests** live in `../vault/
 | --- | --- |
 | **Authoring or building slides** | [[Slide Deck Development]] (combined decks) or [[Marp Slide Build Runbook]] (one Marp file) |
 | **Changing colors or layout** | [`themes/README.md`](themes/README.md) |
-| **Extending the pipeline** | [`BUILD.md`](BUILD.md) |
+| **Extending the pipeline** | [`BUILD.md`](BUILD.md) — update it when you change `tools/` or build behavior |
+
+## Documentation map
+
+Vault workflows and runbooks describe **what to author**; this folder holds **scripts and maintainer specs**.
+
+```mermaid
+flowchart TB
+  subgraph vault [Vault - process]
+    SDD["Slide Deck Development"]
+    MSBR["Marp Slide Build Runbook"]
+  end
+
+  subgraph repo [presentations/ - execution]
+    README["README.md"]
+    BUILD["BUILD.md"]
+    PKG["package.json"]
+    TOOLS["tools/*.js + *.py"]
+    THEMES["themes/*.json"]
+  end
+
+  SDD -->|"Step 4: VS Code task"| README
+  SDD -->|"env / npm / impl detail"| BUILD
+  MSBR -->|"Marp-only builds"| BUILD
+  README --> BUILD
+  BUILD --> PKG
+  PKG --> TOOLS
+  TOOLS --> THEMES
+```
+
+| Layer | Location | Role |
+| --- | --- | --- |
+| Workflow | [[Slide Deck Development]] | Combined decks: manifest, sources, build |
+| Runbook | [[Marp Slide Build Runbook]] | Single `.marp.md`: preview, Mermaid, export |
+| Quick start | `presentations/README.md` (this file) | Open file → VS Code task |
+| Pipeline spec | [`BUILD.md`](BUILD.md) | Env vars, npm scripts, tool map (maintainers) |
 
 ## Why this folder exists
 

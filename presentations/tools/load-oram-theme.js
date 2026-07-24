@@ -119,6 +119,7 @@ function loadOramTheme(variant) {
 
 /** Legacy flat palette for brief-to-pptx / combine (phase 3+). */
 function toPptxPalette(merged) {
+  const table = merged.table || {};
   return {
     name: merged.name,
     font: merged.font,
@@ -131,6 +132,11 @@ function toPptxPalette(merged) {
     showSlideNumber: merged.chrome.showSlideNumber,
     showTakeawayBand: merged.chrome.showTakeawayBand,
     sizes: { ...merged.typography.pptx },
+    tableStripe: table.stripe || "row",
+    tableHeaderFill: table.headerFill,
+    tableHeaderText: table.headerText,
+    tableBandFill: table.bandFill || table.bandFillB,
+    tableCellText: table.cellText,
   };
 }
 

@@ -38,5 +38,12 @@
   },
   "pdf": {
     "marpTheme": "oram-dark"
+  },
+  "table": {
+    "stripe": "row",
+    "headerFill": "#4A3F35",
+    "headerText": "#F0EBE6",
+    "bandFill": "#524638",
+    "cellText": "#F0EBE6"
   }
 }

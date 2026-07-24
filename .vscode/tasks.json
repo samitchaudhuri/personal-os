@@ -39,6 +39,12 @@
       "type": "shell",
       "command": "node presentations/tools/run-active-file.js slides:finish \"${file}\"",
       "problemMatcher": []
+    },
+    {
+      "label": "Slides: Sync HW slides",
+      "type": "shell",
+      "command": "npm --prefix presentations run slides:sync-hw",
+      "problemMatcher": []
     }
   ]
 }

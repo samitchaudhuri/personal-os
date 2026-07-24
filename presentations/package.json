@@ -16,6 +16,7 @@
     "slides:write-pptx-theme": "node tools/write-pptx-theme.js",
     "slides:pptx": "node tools/run-deck-python.js brief",
     "slides:combine": "node tools/run-deck-python.js combine",
+    "slides:sync-hw": "node tools/sync-hw-slides.js",
     "themes:generate-pdf": "node tools/generate-marp-pdf-themes.js",
     "themes:check-pdf": "node tools/check-oram-pdf-themes.js",
     "themes:check": "node tools/check-oram-theme.js",

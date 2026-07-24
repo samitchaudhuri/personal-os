@@ -86,9 +86,11 @@ What they pin down:
 - Parser (`parse_report_text`) against `tests/fixtures/camden_report.txt`, a
   captured VT Site Report. If VisionTrack changes their PDF layout or a
   dependency drifts, the failing test names the exact field that broke.
-- Compute rules: gate boundaries (`pass` <= 12500, `borderline` <= +10%, else
-  `fail`, `TODO` when inputs missing), the four flags, placer weekend
-  ratio/pattern, composite weighting, and that the weights sum to 1.0.
+- Compute rules: gate boundaries (`pass` <= afford_ceiling_hard, currently
+  17000; `borderline` <= +10%; else `fail`; `TODO` when inputs missing), the
+  four flags, placer weekend ratio/pattern, composite weighting, and that the
+  weights sum to 1.0. `afford_preferred` (12500) and `afford_comfortable`
+  (10000) are informational bands for reports, not gate cutoffs.
 
 Formulas (also enforced by the tests):
 

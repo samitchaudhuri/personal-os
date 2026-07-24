@@ -28,9 +28,17 @@ from pathlib import Path
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from pptx import Presentation
 from pptx.dml.color import RGBColor
+from pptx.enum.dml import MSO_FILL_TYPE
 from pptx.enum.shapes import MSO_SHAPE, MSO_SHAPE_TYPE
 from pptx.enum.text import MSO_ANCHOR, MSO_AUTO_SIZE, PP_ALIGN
+from pptx.oxml import parse_xml
 from pptx.util import Emu, Inches, Pt
+
+_DRAWING_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
+_DRAWING_TAG = f"{{{_DRAWING_NS}}}"  # Clark notation for lxml element find()
+_TABLE_BORDER_TAG = {"left": "lnL", "right": "lnR", "top": "lnT", "bottom": "lnB"}
+_TABLE_TBL_BORDER_SIDES = ("left", "right", "top", "bottom", "insideH", "insideV")
+TABLE_BORDER_WIDTH_PT = 1.0
 
 THEMES_DIR = Path(__file__).resolve().parent.parent / "themes"
 DEFAULT_COMMON_PATH = THEMES_DIR / "oram-common.json"
@@ -46,6 +54,12 @@ SHOW_KICKER = True
 SHOW_SLIDE_NUMBER = True
 SHOW_TAKEAWAY_BAND = True
 SIZES = {"title": 28, "kicker": 13, "body": 16, "heading": 17, "takeaway": 15, "number": 13}
+TABLE_STRIPE = "row"
+TABLE_HEADER_FILL = RGBColor(0xC9, 0xA8, 0x8E)
+TABLE_HEADER_TEXT = RGBColor(0x1A, 0x1A, 0x1A)
+TABLE_BAND_FILL = RGBColor(0xF5, 0xEB, 0xE4)
+TABLE_CELL_TEXT = RGBColor(0x1A, 0x1A, 0x1A)
+VALID_TABLE_STRIPES = frozenset({"row", "column", "none"})
 
 # Layout defaults mirror themes/oram-common.json until load_layout() runs.
 SLIDE_W = Inches(13.333)
@@ -108,6 +122,8 @@ def load_theme(path):
     """Override the module-level chrome globals from a theme JSON file."""
     global ACCENT, INK, TAKEAWAY_FILL, TAKEAWAY_TEXT, BACKGROUND, FONT
     global SHOW_KICKER, SHOW_SLIDE_NUMBER, SHOW_TAKEAWAY_BAND, SIZES
+    global TABLE_STRIPE, TABLE_HEADER_FILL, TABLE_HEADER_TEXT, TABLE_BAND_FILL
+    global TABLE_CELL_TEXT
     data = json.loads(Path(path).read_text(encoding="utf-8"))
     colors = {
         "ink": "INK",
@@ -119,6 +135,28 @@ def load_theme(path):
     for key, name in colors.items():
         if data.get(key):
             globals()[name] = RGBColor.from_string(str(data[key]).lstrip("#"))
+    table_colors = {
+        "tableHeaderFill": "TABLE_HEADER_FILL",
+        "tableHeaderText": "TABLE_HEADER_TEXT",
+        "tableBandFill": "TABLE_BAND_FILL",
+        "tableCellText": "TABLE_CELL_TEXT",
+    }
+    for key, name in table_colors.items():
+        if data.get(key):
+            globals()[name] = RGBColor.from_string(str(data[key]).lstrip("#"))
+    # Legacy palette keys (bandFillB / bandFillA from older builds).
+    if not data.get("tableBandFill") and data.get("tableBandFillB"):
+        globals()["TABLE_BAND_FILL"] = RGBColor.from_string(
+            str(data["tableBandFillB"]).lstrip("#")
+        )
+    if data.get("tableStripe"):
+        stripe = str(data["tableStripe"]).strip().lower()
+        if stripe not in VALID_TABLE_STRIPES:
+            fail(
+                f'Invalid tableStripe in {path}: "{data["tableStripe"]}" '
+                f"(expected row, column, or none)."
+            )
+        globals()["TABLE_STRIPE"] = stripe
     if data.get("font"):
         FONT = str(data["font"])
     toggles = {
@@ -524,13 +562,26 @@ def _chrome_fields(chrome):
     }
 
 
+def _add_slide_number_shape(slide, number, top=None):
+    """Add top-right slide number textbox at standard chrome position."""
+    chrome_top = CHROME_TOP if top is None else top
+    num_w = Inches(1.2)
+    nbox = slide.shapes.add_textbox(
+        Emu(SLIDE_W - MARGIN - num_w), chrome_top, num_w, KICKER_H
+    )
+    _fill_slide_number_text_frame(nbox.text_frame, number)
+    return nbox
+
+
 def apply_slide_background(slide):
     """Set slide canvas fill from the active theme (SW render + HW stamp)."""
     slide.background.fill.solid()
     slide.background.fill.fore_color.rgb = BACKGROUND
 
 
-def apply_slide_chrome(slide, chrome, *, number=None, top=None, mode="stamp"):
+def apply_slide_chrome(
+    slide, chrome, *, number=None, top=None, mode="stamp", table_stripe=None
+):
     """Apply themed slide chrome from one entry point.
 
     ``mode``:
@@ -547,7 +598,7 @@ def apply_slide_chrome(slide, chrome, *, number=None, top=None, mode="stamp"):
         if number is not None and SHOW_SLIDE_NUMBER:
             shape = find_slide_number_shape(slide)
             if shape is None:
-                missing.append("number")
+                _add_slide_number_shape(slide, number)
             else:
                 _fill_slide_number_text_frame(shape.text_frame, number)
 
@@ -574,22 +625,27 @@ def apply_slide_chrome(slide, chrome, *, number=None, top=None, mode="stamp"):
                 _fill_takeaway_text_frame(shape.text_frame, fields["takeaway"])
                 _bring_shape_to_front(shape)
 
+        recolor_transparent_text_boxes(slide)
+        recolor_automatic_opaque_text_boxes(slide)
+        recolor_automatic_diagram_lines(slide)
+        recolor_table_shapes(slide, stripe=table_stripe)
         return missing
 
     if mode == "create_header":
         if top is None:
             fail("apply_slide_chrome(create_header) requires top=CHROME_TOP")
 
+        header_row = False
         if number is not None and SHOW_SLIDE_NUMBER:
-            num_w = Inches(1.2)
-            nbox = slide.shapes.add_textbox(
-                Emu(SLIDE_W - MARGIN - num_w), top, num_w, KICKER_H
-            )
-            _fill_slide_number_text_frame(nbox.text_frame, number)
+            _add_slide_number_shape(slide, number, top=top)
+            header_row = True
 
         if fields["role"] and SHOW_KICKER:
             box = slide.shapes.add_textbox(MARGIN, top, CONTENT_W, KICKER_H)
             _fill_kicker_text_frame(box.text_frame, fields["role"])
+            header_row = True
+
+        if header_row:
             top = Emu(top + KICKER_H + GAP_AFTER_KICKER)
 
         if fields["title"]:
@@ -654,6 +710,353 @@ def find_kicker_shape(slide):
 def _shape_key(shape):
     """Stable identity for a shape (``id()`` is not reliable across pptx iterators)."""
     return (shape.top, shape.left, shape.width, shape.height)
+
+
+_SKIP_TRANSPARENT_RECOLOR_TYPES = {
+    MSO_SHAPE_TYPE.PICTURE,
+    MSO_SHAPE_TYPE.TABLE,
+    MSO_SHAPE_TYPE.CHART,
+    MSO_SHAPE_TYPE.LINKED_PICTURE,
+    MSO_SHAPE_TYPE.MEDIA,
+    MSO_SHAPE_TYPE.EMBEDDED_OLE_OBJECT,
+    MSO_SHAPE_TYPE.LINKED_OLE_OBJECT,
+}
+
+
+def _shape_has_solid_fill(shape):
+    """True when the shape has an explicit solid fill (opaque label/badge)."""
+    if not hasattr(shape, "fill"):
+        return False
+    try:
+        fill_type = shape.fill.type
+    except (AttributeError, TypeError):
+        fill_type = None
+    if fill_type == MSO_FILL_TYPE.SOLID:
+        return True
+    if fill_type is None:
+        sp_pr = shape._element.spPr
+        if sp_pr is not None:
+            if sp_pr.find(f"{_DRAWING_TAG}solidFill") is not None:
+                return True
+    return False
+
+
+def _chrome_shape_keys(slide):
+    """Identity keys for shapes already handled as slide chrome."""
+    keys = set()
+    for finder in (
+        find_slide_number_shape,
+        find_kicker_shape,
+        find_title_shape,
+        find_takeaway_shape,
+    ):
+        found = finder(slide)
+        if found:
+            keys.add(_shape_key(found))
+    return keys
+
+
+# Theme slots PowerPoint treats as "Automatic" text (not a deliberate accent pick).
+_AUTOMATIC_SCHEME_COLORS = frozenset({"tx1", "dk1", "lt1"})
+
+# Light-mode authoring defaults for diagram strokes (PowerPoint black / near-black).
+_AUTOMATIC_LINE_RGB = frozenset({"000000", "1A1A1A", "2A2420"})
+
+
+def _shape_sp_pr(shape):
+    if not hasattr(shape, "_element"):
+        return None
+    return getattr(shape._element, "spPr", None)
+
+
+def _line_element(shape):
+    sp_pr = _shape_sp_pr(shape)
+    if sp_pr is None:
+        return None
+    return sp_pr.find(f"{_DRAWING_TAG}ln")
+
+
+def _run_has_explicit_font_color(run):
+    """True when the run has a deliberate font color (skip on opaque badge recolor)."""
+    rpr = run._r.rPr
+    if rpr is None:
+        return False
+    solid = rpr.find(f"{_DRAWING_TAG}solidFill")
+    if solid is None:
+        return False
+    if solid.find(f"{_DRAWING_TAG}srgbClr") is not None:
+        return True
+    scheme = solid.find(f"{_DRAWING_TAG}schemeClr")
+    if scheme is not None:
+        return scheme.get("val") not in _AUTOMATIC_SCHEME_COLORS
+    return True
+
+
+def _set_text_frame_ink(tf):
+    """Set all runs in a text frame to theme ink (diagram/callout labels)."""
+    for para in tf.paragraphs:
+        for run in para.runs:
+            run.font.color.rgb = INK
+            if FONT:
+                run.font.name = FONT
+
+
+def _set_text_frame_automatic_ink(tf):
+    """Set theme ink only on runs still using automatic / theme-default text color."""
+    for para in tf.paragraphs:
+        for run in para.runs:
+            if _run_has_explicit_font_color(run):
+                continue
+            run.font.color.rgb = INK
+            if FONT:
+                run.font.name = FONT
+
+
+def _recolor_transparent_shapes(shapes, skip):
+    """Walk ``shapes`` (slide or group children); recurse into groups."""
+    for shape in shapes:
+        if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+            _recolor_transparent_shapes(shape.shapes, skip)
+            continue
+        if shape.shape_type in _SKIP_TRANSPARENT_RECOLOR_TYPES:
+            continue
+        if not shape.has_text_frame:
+            continue
+        if _shape_key(shape) in skip:
+            continue
+        if _shape_has_solid_fill(shape):
+            continue
+        _set_text_frame_ink(shape.text_frame)
+
+
+def recolor_transparent_text_boxes(slide):
+    """After chrome stamp, set theme ink on transparent text boxes and callouts."""
+    _recolor_transparent_shapes(slide.shapes, _chrome_shape_keys(slide))
+
+
+def _recolor_automatic_opaque_shapes(shapes, skip):
+    """Solid-fill text boxes/callouts: set ink on automatic-color runs only."""
+    for shape in shapes:
+        if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+            _recolor_automatic_opaque_shapes(shape.shapes, skip)
+            continue
+        if shape.shape_type in _SKIP_TRANSPARENT_RECOLOR_TYPES:
+            continue
+        if not shape.has_text_frame:
+            continue
+        if _shape_key(shape) in skip:
+            continue
+        if not _shape_has_solid_fill(shape):
+            continue
+        _set_text_frame_automatic_ink(shape.text_frame)
+
+
+def recolor_automatic_opaque_text_boxes(slide):
+    """After chrome stamp, set theme ink on automatic text in opaque callouts/badges."""
+    _recolor_automatic_opaque_shapes(slide.shapes, _chrome_shape_keys(slide))
+
+
+def _line_has_explicit_color(shape):
+    """True when the shape stroke should not be recolored to theme ink."""
+    if not hasattr(shape, "line"):
+        return True
+    ln = _line_element(shape)
+    if ln is None:
+        return True
+    if ln.find(f"{_DRAWING_TAG}noFill") is not None:
+        return True
+    solid = ln.find(f"{_DRAWING_TAG}solidFill")
+    if solid is None:
+        return True  # no visible stroke — do not add one
+    rgb = solid.find(f"{_DRAWING_TAG}srgbClr")
+    if rgb is not None:
+        val = (rgb.get("val") or "").upper()
+        return val not in _AUTOMATIC_LINE_RGB
+    scheme = solid.find(f"{_DRAWING_TAG}schemeClr")
+    if scheme is not None:
+        return scheme.get("val") not in _AUTOMATIC_SCHEME_COLORS
+    return True
+
+
+def _set_shape_line_ink(shape):
+    """Set stroke color to theme ink; preserve any existing alpha on the stroke."""
+    ln = _line_element(shape)
+    alpha_val = None
+    if ln is not None:
+        solid = ln.find(f"{_DRAWING_TAG}solidFill")
+        if solid is not None:
+            rgb_el = solid.find(f"{_DRAWING_TAG}srgbClr")
+            if rgb_el is not None:
+                alpha = rgb_el.find(f"{_DRAWING_TAG}alpha")
+                if alpha is not None:
+                    alpha_val = alpha.get("val")
+    shape.line.fill.solid()
+    shape.line.color.rgb = INK
+    if alpha_val is not None:
+        ln = _line_element(shape)
+        solid = ln.find(f"{_DRAWING_TAG}solidFill") if ln is not None else None
+        rgb_el = solid.find(f"{_DRAWING_TAG}srgbClr") if solid is not None else None
+        if rgb_el is not None and rgb_el.find(f"{_DRAWING_TAG}alpha") is None:
+            rgb_el.append(
+                parse_xml(f'<a:alpha xmlns:a="{_DRAWING_NS}" val="{alpha_val}"/>')
+            )
+
+
+def _recolor_automatic_line_shapes(shapes, skip):
+    """Walk shapes; set ink on default-black / automatic diagram strokes."""
+    for shape in shapes:
+        if shape.shape_type == MSO_SHAPE_TYPE.GROUP:
+            _recolor_automatic_line_shapes(shape.shapes, skip)
+            continue
+        if shape.shape_type in _SKIP_TRANSPARENT_RECOLOR_TYPES:
+            continue
+        if _shape_key(shape) in skip:
+            continue
+        if not hasattr(shape, "line"):
+            continue
+        if _line_has_explicit_color(shape):
+            continue
+        _set_shape_line_ink(shape)
+
+
+def recolor_automatic_diagram_lines(slide):
+    """After chrome stamp, set theme ink on automatic / default-black diagram strokes."""
+    _recolor_automatic_line_shapes(slide.shapes, _chrome_shape_keys(slide))
+
+
+def _normalize_table_stripe(stripe):
+    """Return a validated stripe mode (row, column, none)."""
+    if stripe is None:
+        return TABLE_STRIPE
+    mode = str(stripe).strip().lower()
+    if mode not in VALID_TABLE_STRIPES:
+        fail(f'Invalid table stripe mode "{stripe}" (expected row, column, or none).')
+    return mode
+
+
+def _set_cell_fill(cell, rgb):
+    cell.fill.solid()
+    cell.fill.fore_color.rgb = rgb
+
+
+def _set_cell_text_color(cell, rgb):
+    tf = cell.text_frame
+    for para in tf.paragraphs:
+        if para.runs:
+            for run in para.runs:
+                run.font.color.rgb = rgb
+        else:
+            run = para.add_run()
+            run.font.color.rgb = rgb
+
+
+def _table_data_fill(band_index):
+    """Alternate canvas background with one theme band color."""
+    return BACKGROUND if band_index % 2 == 0 else TABLE_BAND_FILL
+
+
+def _table_border_side_xml(side, hex_val, width_emu, *, ln_tag=None):
+    """OOXML for one table/cell border side."""
+    tag = ln_tag or side
+    return (
+        f"<a:{tag} w=\"{width_emu}\" cap=\"flat\" cmpd=\"sng\" algn=\"ctr\">"
+        f"<a:solidFill><a:srgbClr val=\"{hex_val}\"/></a:solidFill>"
+        f'<a:prstDash val="solid"/>'
+        f"</a:{tag}>"
+    )
+
+
+def _set_cell_borders(cell, rgb, width_pt=TABLE_BORDER_WIDTH_PT):
+    """Set all four cell borders to ``rgb`` (matches header frame color)."""
+    tc_pr = cell._tc.get_or_add_tcPr()
+    hex_val = str(rgb)
+    width_emu = int(width_pt * 12700)
+    for side in _TABLE_BORDER_TAG:
+        tag = _TABLE_BORDER_TAG[side]
+        existing = tc_pr.find(f"{_DRAWING_TAG}{tag}")
+        if existing is not None:
+            tc_pr.remove(existing)
+        tc_pr.append(
+            parse_xml(
+                f'<a:{tag} xmlns:a="{_DRAWING_NS}" w="{width_emu}" cap="flat" '
+                f'cmpd="sng" algn="ctr">'
+                f'<a:solidFill><a:srgbClr val="{hex_val}"/></a:solidFill>'
+                f'<a:prstDash val="solid"/></a:{tag}>'
+            )
+        )
+
+
+def _set_table_level_borders(table, rgb, width_pt=TABLE_BORDER_WIDTH_PT):
+    """Stamp explicit tblBorders on tblPr (overrides default theme tx1 grid)."""
+    tbl_pr = table._tbl.tblPr
+    existing = tbl_pr.find(f"{_DRAWING_TAG}tblBorders")
+    if existing is not None:
+        tbl_pr.remove(existing)
+    hex_val = str(rgb)
+    width_emu = int(width_pt * 12700)
+    sides = "".join(
+        _table_border_side_xml(side, hex_val, width_emu) for side in _TABLE_TBL_BORDER_SIDES
+    )
+    tbl_pr.append(
+        parse_xml(f'<a:tblBorders xmlns:a="{_DRAWING_NS}">{sides}</a:tblBorders>')
+    )
+
+
+def _detach_table_style(table):
+    """Remove embedded table style so tblBorders + cell tcPr control the grid."""
+    tbl_pr = table._tbl.tblPr
+    style_id = tbl_pr.find(f"{_DRAWING_TAG}tableStyleId")
+    if style_id is not None:
+        tbl_pr.remove(style_id)
+    look = tbl_pr.find(f"{_DRAWING_TAG}tblLook")
+    if look is None:
+        tbl_pr.append(
+            parse_xml(
+                f'<a:tblLook xmlns:a="{_DRAWING_NS}" firstRow="0" lastRow="0" '
+                f'firstCol="0" lastCol="0" bandRow="0" bandCol="0"/>'
+            )
+        )
+    else:
+        for attr in (
+            "firstRow",
+            "lastRow",
+            "firstCol",
+            "lastCol",
+            "bandRow",
+            "bandCol",
+        ):
+            look.set(attr, "0")
+
+
+def recolor_table_shapes(slide, stripe=None):
+    """Theme HW tables: row 0 + column 0 = header frame; data cells banded."""
+    mode = _normalize_table_stripe(stripe)
+    for shape in slide.shapes:
+        if not shape.has_table:
+            continue
+        table = shape.table
+        _detach_table_style(table)
+        _set_table_level_borders(table, TABLE_HEADER_FILL)
+        rows = len(table.rows)
+        cols = len(table.columns)
+        for r in range(rows):
+            for c in range(cols):
+                cell = table.cell(r, c)
+                if r == 0 or c == 0:
+                    _set_cell_fill(cell, TABLE_HEADER_FILL)
+                    _set_cell_text_color(cell, TABLE_HEADER_TEXT)
+                elif mode == "none":
+                    _set_cell_fill(cell, BACKGROUND)
+                    _set_cell_text_color(cell, TABLE_CELL_TEXT)
+                elif mode == "column":
+                    fill = _table_data_fill(c - 1)
+                    _set_cell_fill(cell, fill)
+                    _set_cell_text_color(cell, TABLE_CELL_TEXT)
+                else:
+                    fill = _table_data_fill(r - 1)
+                    _set_cell_fill(cell, fill)
+                    _set_cell_text_color(cell, TABLE_CELL_TEXT)
+                _set_cell_borders(cell, TABLE_HEADER_FILL)
 
 
 def find_title_shape(slide):

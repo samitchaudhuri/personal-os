@@ -49,6 +49,36 @@ def parse_frontmatter(path):
     return data if isinstance(data, dict) else {}
 
 
+def normalize_table_stripe(value, *, context="table_stripe"):
+    """Return ``row``, ``column``, or ``none``; fail on invalid values."""
+    if value is None:
+        return None
+    mode = str(value).strip().lower()
+    if mode in ("row", "column", "none"):
+        return mode
+    b2p.fail(f'Invalid {context} value {value!r} (expected row, column, or none).')
+
+
+def resolve_table_stripe(manifest_path, tag):
+    """Stripe mode for one HW slide tag from deck note ``table_stripe`` frontmatter."""
+    raw = parse_frontmatter(manifest_path).get("table_stripe")
+    if raw is None:
+        return None
+    if isinstance(raw, str):
+        return normalize_table_stripe(raw)
+    if isinstance(raw, dict):
+        if tag in raw:
+            return normalize_table_stripe(raw[tag], context=f"table_stripe.{tag}")
+        if "default" in raw:
+            return normalize_table_stripe(
+                raw["default"], context="table_stripe.default"
+            )
+    b2p.fail(
+        f"table_stripe in {manifest_path} must be a string or mapping "
+        f"(default + per-tag keys like H1)."
+    )
+
+
 def _normalize_source(entry):
     """Return ``{file, prefix, type, path?}`` for one ``deck_sources`` entry."""
     if not isinstance(entry, dict):
@@ -359,8 +389,9 @@ def combine(brief_path, png_dir, out_path, manifest_path, theme_path=None):
         final_pos = order.index(tag) + 1
         slide = prs.slides[k]
         row = spine[tag]
+        table_stripe = resolve_table_stripe(manifest_path, tag)
         fields = b2p.apply_slide_chrome(
-            slide, row, number=final_pos, mode="stamp"
+            slide, row, number=final_pos, mode="stamp", table_stripe=table_stripe
         )
         for field in fields:
             missing_chrome.append(f"{tag} ({field})")
