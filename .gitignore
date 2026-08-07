@@ -52,6 +52,7 @@ presentations/build/
 
 .cursor/*
 !.cursor/rules/
+!.cursor/skills
 
 # If rules should also be selective:
 # !.cursor/rules/*.mdc
