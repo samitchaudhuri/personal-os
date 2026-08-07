@@ -50,9 +50,13 @@ presentations/build/
 # Optional: if you ever create local-only overrides
 .vscode/settings.local.json
 
+# Harness skill bridges — track the vault symlink; ignore other local harness files
 .cursor/*
 !.cursor/rules/
 !.cursor/skills
+
+.claude/*
+!.claude/skills
 
 # If rules should also be selective:
 # !.cursor/rules/*.mdc
@@ -67,8 +71,6 @@ presentations/build/
 # Tool-specific
 .specstory/
 .factory/
-.claude/settings.local.json
-.claude/agents
 .agent
 
 # Logs
