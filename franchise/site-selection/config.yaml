@@ -3,9 +3,10 @@
 # The vault Rules registry ([[Site Selection Scoring]]) explains each rule and
 # cites this file for the exact value; it does not restate the numbers.
 
-# Data lives in Google Drive (L1 PDFs + manual_facts.csv + combined_facts.csv).
-# Code + this config live in git (personal-os). Override drive_base per machine.
-drive_base: "/Users/samit/Library/CloudStorage/GoogleDrive-samit.chaudhuri@gmail.com/My Drive/Work/Franchise/Ultimate Longevity/Development/Site Selection/Candidates"
+# Data lives in Google Drive (L1 PDFs + manual_facts.csv + combined_facts.csv),
+# reached via personal-os/gdrive (repo symlink). Code + this config live in git.
+# Override drive_base only if the gdrive symlink is not present on this machine.
+drive_base: "/Users/samit/work/personal-os/gdrive/shared/ULC/Development/Site Selection/Candidates"
 comparison_dir: "_comparison"
 manual_file: "manual_facts.csv"
 output_file: "combined_facts.csv"
@@ -43,3 +44,6 @@ site_names:
   the-platform: "The Platform"
   sc-square: "SC Square"
   the-clara: "The Clara"
+  first-retail-center: "First Retail Center"
+  gateway-crossing-orlo: "Gateway Crossing Orlo"
+  prado: "Prado"
