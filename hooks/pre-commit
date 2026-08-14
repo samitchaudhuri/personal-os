@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# Hard gate: if a commit touches an excepted tool, that tool's tests must pass.
+# Tracked in-repo and installed into .git/hooks via hooks/install.sh.
+# Bypass (discouraged): git commit --no-verify
+set -uo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+STAGED="$(git diff --cached --name-only)"
+
+run_tool_tests() {
+  local tool_dir="$1"
+  local label="$2"
+  local py="$REPO_ROOT/$tool_dir/.venv/bin/python"
+  if [ ! -x "$py" ]; then
+    py="$(command -v python3 || true)"
+  fi
+  if [ -z "$py" ]; then
+    echo "pre-commit: no python found to run $label tests. Set up .venv or use --no-verify to bypass." >&2
+    exit 1
+  fi
+  echo "pre-commit: $label changed -> running tests"
+  if ! ( cd "$REPO_ROOT/$tool_dir" && "$py" -m unittest discover -s tests ); then
+    echo "pre-commit: $label tests FAILED — commit blocked. Fix them (or bypass with --no-verify)." >&2
+    exit 1
+  fi
+  echo "pre-commit: $label tests passed."
+}
+
+if echo "$STAGED" | grep -q '^franchise/site-selection/'; then
+  run_tool_tests "franchise/site-selection" "site-selection"
+fi
+
+if echo "$STAGED" | grep -q '^inbound-feeds/'; then
+  run_tool_tests "inbound-feeds" "inbound-feeds"
+fi
+
+exit 0

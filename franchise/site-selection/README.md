@@ -61,12 +61,13 @@ tool if its tests fail. Git hooks live outside version control, so install once
 per clone:
 
 ```bash
-bash franchise/site-selection/hooks/install.sh
+bash hooks/install.sh
 ```
 
-The hook (`hooks/pre-commit`) only runs when `franchise/site-selection/` files
-are staged, so unrelated commits are unaffected. Emergency bypass (discouraged):
-`git commit --no-verify`.
+`bash franchise/site-selection/hooks/install.sh` still works; it installs the
+same repo-root dispatcher. The hook only runs this tool's tests when
+`franchise/site-selection/` files are staged, so unrelated commits are
+unaffected. Emergency bypass (discouraged): `git commit --no-verify`.
 
 The contract is written down in three places, closest-to-code first:
 
