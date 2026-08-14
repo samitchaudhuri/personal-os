@@ -1,7 +1,8 @@
 """Localhost Desktop OAuth loop for inbound feeds.
 
-Writes Google authorized_user JSON for one source and probes one Gmail list
-page. Does not Pull, Filter, or Store mail.
+Writes Google authorized_user JSON for one source and probes one list page
+(Gmail or Calendar). Does not Pull, Filter, or Store mail, and does not
+materialize calendar events.
 """
 
 from __future__ import annotations
@@ -14,14 +15,44 @@ from pathlib import Path
 from typing import Any, Mapping
 
 GMAIL_READONLY_SCOPE = "https://www.googleapis.com/auth/gmail.readonly"
+CALENDAR_READONLY_SCOPE = "https://www.googleapis.com/auth/calendar.readonly"
 SCOPES = [GMAIL_READONLY_SCOPE]
 GMAIL_LIST_URL = "https://gmail.googleapis.com/gmail/v1/users/me/messages"
+CALENDAR_LIST_URL = "https://www.googleapis.com/calendar/v3/users/me/calendarList"
 TOKEN_URI = "https://oauth2.googleapis.com/token"
 AUTH_URI = "https://accounts.google.com/o/oauth2/auth"
 
+FEED_GMAIL = "gmail"
+FEED_CALENDAR = "calendar"
+
 SOURCE_ULC_GMAIL = "ulc_gmail"
-SOURCE_LABELS = {SOURCE_ULC_GMAIL: "ULC Gmail"}
-SOURCE_TOKEN_FILES = {SOURCE_ULC_GMAIL: "ulc_gmail.json"}
+SOURCE_PERSONAL_GMAIL = "personal_gmail"
+SOURCE_ULC_CALENDAR = "ulc_calendar"
+SOURCE_PERSONAL_CALENDAR = "personal_calendar"
+SOURCE_LABELS = {
+    SOURCE_ULC_GMAIL: "ULC Gmail",
+    SOURCE_PERSONAL_GMAIL: "Personal Gmail",
+    SOURCE_ULC_CALENDAR: "ULC Calendar",
+    SOURCE_PERSONAL_CALENDAR: "Personal Calendar",
+}
+SOURCE_TOKEN_FILES = {
+    SOURCE_ULC_GMAIL: "ulc_gmail.json",
+    SOURCE_PERSONAL_GMAIL: "personal_gmail.json",
+    SOURCE_ULC_CALENDAR: "ulc_calendar.json",
+    SOURCE_PERSONAL_CALENDAR: "personal_calendar.json",
+}
+SOURCE_FEEDS = {
+    SOURCE_ULC_GMAIL: FEED_GMAIL,
+    SOURCE_PERSONAL_GMAIL: FEED_GMAIL,
+    SOURCE_ULC_CALENDAR: FEED_CALENDAR,
+    SOURCE_PERSONAL_CALENDAR: FEED_CALENDAR,
+}
+SOURCE_SCOPES = {
+    SOURCE_ULC_GMAIL: [GMAIL_READONLY_SCOPE],
+    SOURCE_PERSONAL_GMAIL: [GMAIL_READONLY_SCOPE],
+    SOURCE_ULC_CALENDAR: [CALENDAR_READONLY_SCOPE],
+    SOURCE_PERSONAL_CALENDAR: [CALENDAR_READONLY_SCOPE],
+}
 
 CONFIG_DIR = Path.home() / ".config" / "personal-os-inbound-feeds"
 CLIENT_FILE = CONFIG_DIR / "client.json"
@@ -48,6 +79,28 @@ def source_token_filename(source: str) -> str:
         return SOURCE_TOKEN_FILES[source]
     except KeyError as exc:
         raise ValueError(f"unknown source: {source}") from exc
+
+
+def source_feed(source: str) -> str:
+    try:
+        return SOURCE_FEEDS[source]
+    except KeyError as exc:
+        raise ValueError(f"unknown source: {source}") from exc
+
+
+def scopes_for(source: str) -> list[str]:
+    try:
+        return list(SOURCE_SCOPES[source])
+    except KeyError as exc:
+        raise ValueError(f"unknown source: {source}") from exc
+
+
+def calendar_sources() -> list[str]:
+    return sorted(s for s, feed in SOURCE_FEEDS.items() if feed == FEED_CALENDAR)
+
+
+def gmail_sources() -> list[str]:
+    return sorted(s for s, feed in SOURCE_FEEDS.items() if feed == FEED_GMAIL)
 
 
 def token_path_for(source: str, config_dir: Path = CONFIG_DIR) -> Path:
@@ -170,6 +223,17 @@ def probe_gmail_list(session: Any) -> int:
     return int(response.status_code)
 
 
+def probe_calendar_list(session: Any) -> int:
+    response = session.get(CALENDAR_LIST_URL, params={"maxResults": 1})
+    return int(response.status_code)
+
+
+def probe_source(session: Any, source: str) -> tuple[str, int]:
+    if source_feed(source) == FEED_CALENDAR:
+        return "Calendar list", probe_calendar_list(session)
+    return "Gmail list", probe_gmail_list(session)
+
+
 def authorized_user_from_credentials(creds: Any) -> dict[str, Any]:
     payload = json.loads(creds.to_json())
     if "type" not in payload:
@@ -180,29 +244,36 @@ def authorized_user_from_credentials(creds: Any) -> dict[str, Any]:
     return payload
 
 
-def run_desktop_oauth(client_id: str, client_secret: str) -> Any:
+def run_desktop_oauth(
+    client_id: str,
+    client_secret: str,
+    scopes: list[str] | None = None,
+    label: str = "ULC Gmail",
+) -> Any:
     from google_auth_oauthlib.flow import InstalledAppFlow
 
+    used_scopes = scopes if scopes is not None else SCOPES
     flow = InstalledAppFlow.from_client_config(
         client_config_for(client_id, client_secret),
-        scopes=SCOPES,
+        scopes=used_scopes,
     )
     return flow.run_local_server(
         port=0,
         access_type="offline",
         prompt="consent",
         authorization_prompt_message=(
-            "Open the browser window to grant ULC Gmail read access.\n"
+            f"Open the browser window to grant {label} read access.\n"
             "If it does not open, visit: {url}\n"
         ),
         success_message="You can close this tab and return to the terminal.",
     )
 
 
-def load_existing_credentials(path: Path, scopes: list[str] = SCOPES) -> Any:
+def load_existing_credentials(path: Path, scopes: list[str] | None = None) -> Any:
     from google.oauth2.credentials import Credentials
 
-    return Credentials.from_authorized_user_file(str(path), scopes)
+    used = scopes if scopes is not None else SCOPES
+    return Credentials.from_authorized_user_file(str(path), used)
 
 
 def refresh_if_needed(creds: Any) -> Any:
@@ -222,8 +293,9 @@ def authorized_session(creds: Any) -> Any:
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Localhost Desktop OAuth for ULC Gmail. Writes authorized_user "
-            "JSON and probes one Gmail list page. Does not store mail."
+            "Localhost Desktop OAuth for inbound feeds. Writes authorized_user "
+            "JSON and probes one Gmail or Calendar list page. Does not store "
+            "mail or events."
         )
     )
     parser.add_argument(
@@ -261,17 +333,18 @@ def main(argv: list[str] | None = None) -> int:
         print("Use either --probe-only or --force, not both.", file=sys.stderr)
         return 2
 
+    scopes = scopes_for(args.source)
     creds = None
     if args.probe_only:
         if not path.is_file():
             print(f"No token file at {path}", file=sys.stderr)
             return 2
-        creds = load_existing_credentials(path)
+        creds = load_existing_credentials(path, scopes)
         creds = refresh_if_needed(creds)
         write_token_file(path, authorized_user_from_credentials(creds))
         print(f"Reused token for {label}: {path}")
     elif path.is_file() and not args.force:
-        creds = load_existing_credentials(path)
+        creds = load_existing_credentials(path, scopes)
         creds = refresh_if_needed(creds)
         write_token_file(path, authorized_user_from_credentials(creds))
         print(f"Reused token for {label}: {path}")
@@ -281,14 +354,16 @@ def main(argv: list[str] | None = None) -> int:
         except (OSError, ValueError) as exc:
             print(str(exc), file=sys.stderr)
             return 2
-        creds = run_desktop_oauth(client_id, client_secret)
+        creds = run_desktop_oauth(
+            client_id, client_secret, scopes=scopes, label=label
+        )
         write_token_file(path, authorized_user_from_credentials(creds))
         print(f"Wrote token for {label}: {path}")
 
-    status = probe_gmail_list(authorized_session(creds))
-    print(f"Gmail list status: {status}")
+    probe_name, status = probe_source(authorized_session(creds), args.source)
+    print(f"{probe_name} status: {status}")
     if status != 200:
-        print(f"Expected 200 from Gmail list for {label}", file=sys.stderr)
+        print(f"Expected 200 from {probe_name} for {label}", file=sys.stderr)
         return 1
     return 0
 

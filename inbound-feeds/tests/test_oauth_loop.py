@@ -33,6 +33,30 @@ class TestSourceAndPaths(unittest.TestCase):
         self.assertEqual(loop.source_token_filename("ulc_gmail"), "ulc_gmail.json")
         self.assertNotEqual(loop.source_token_filename("ulc_gmail"), "ulc.json")
 
+    def test_calendar_sources(self):
+        self.assertEqual(loop.source_label("ulc_calendar"), "ULC Calendar")
+        self.assertEqual(
+            loop.source_token_filename("ulc_calendar"), "ulc_calendar.json"
+        )
+        self.assertEqual(loop.source_label("personal_calendar"), "Personal Calendar")
+        self.assertEqual(
+            loop.source_token_filename("personal_calendar"),
+            "personal_calendar.json",
+        )
+        self.assertEqual(loop.source_feed("ulc_calendar"), loop.FEED_CALENDAR)
+        self.assertEqual(loop.source_feed("ulc_gmail"), loop.FEED_GMAIL)
+
+    def test_personal_gmail_label_and_filename(self):
+        self.assertEqual(loop.source_label("personal_gmail"), "Personal Gmail")
+        self.assertEqual(
+            loop.source_token_filename("personal_gmail"), "personal_gmail.json"
+        )
+        self.assertNotEqual(
+            loop.source_token_filename("personal_gmail"), "gmail.json"
+        )
+        self.assertEqual(loop.source_feed("personal_gmail"), loop.FEED_GMAIL)
+        self.assertIn("personal_gmail", loop.gmail_sources())
+
     def test_unknown_source(self):
         for fn in (loop.source_label, loop.source_token_filename):
             with self.assertRaises(ValueError):
@@ -56,6 +80,24 @@ class TestScope(unittest.TestCase):
         )
         self.assertNotIn(loop.GMAIL_READONLY_SCOPE, ("gmail.readonly", "gmail"))
         self.assertEqual(loop.SCOPES, [loop.GMAIL_READONLY_SCOPE])
+
+    def test_calendar_readonly_is_full_uri(self):
+        self.assertEqual(
+            loop.CALENDAR_READONLY_SCOPE,
+            "https://www.googleapis.com/auth/calendar.readonly",
+        )
+        self.assertEqual(
+            loop.scopes_for("ulc_calendar"),
+            [loop.CALENDAR_READONLY_SCOPE],
+        )
+        self.assertEqual(
+            loop.scopes_for("ulc_gmail"),
+            [loop.GMAIL_READONLY_SCOPE],
+        )
+        self.assertNotEqual(
+            loop.scopes_for("ulc_calendar"),
+            loop.scopes_for("ulc_gmail"),
+        )
 
 
 class TestAuthorizedUser(unittest.TestCase):
@@ -199,6 +241,17 @@ class TestProbe(unittest.TestCase):
         session = Mock()
         session.get.return_value = Mock(status_code=401)
         self.assertEqual(loop.probe_gmail_list(session), 401)
+
+    def test_calendar_probe(self):
+        session = Mock()
+        session.get.return_value = Mock(status_code=200)
+        self.assertEqual(loop.probe_calendar_list(session), 200)
+        session.get.assert_called_once_with(
+            loop.CALENDAR_LIST_URL, params={"maxResults": 1}
+        )
+        name, status = loop.probe_source(session, "ulc_calendar")
+        self.assertEqual(name, "Calendar list")
+        self.assertEqual(status, 200)
 
 
 class TestCli(unittest.TestCase):

@@ -1,0 +1,24 @@
+{
+  "id": "msg-plain-1",
+  "threadId": "thread-plain-1",
+  "payload": {
+    "mimeType": "multipart/alternative",
+    "headers": [
+      {"name": "From", "value": "Don Michael <don@ultimatelongevitycenters.com>"},
+      {"name": "To", "value": "Samit Chaudhuri <samit.chaudhuri@ultimatelongevitycenters.com>"},
+      {"name": "Cc", "value": ""},
+      {"name": "Date", "value": "Tue, 11 Aug 2026 09:00:00 -0700"},
+      {"name": "Subject", "value": "LOI deadline Friday"}
+    ],
+    "parts": [
+      {
+        "mimeType": "text/plain",
+        "body": {"data": "UGxlYXNlIHJldmlldyB0aGUgTE9JIGRlYWRsaW5lIGZvciB0aGUgQ2FtcGJlbGwgc2l0ZS4"}
+      },
+      {
+        "mimeType": "text/html",
+        "body": {"data": "PHA+SFRNTCBib2R5IHNob3VsZCBub3Qgd2luPC9wPg"}
+      }
+    ]
+  }
+}
