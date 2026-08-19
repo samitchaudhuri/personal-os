@@ -41,6 +41,7 @@ class CalEvent:
     all_day: bool
     account: str
     source: str
+    organizer: str | None = None
 
 
 def local_tz() -> timezone | ZoneInfo:
@@ -68,6 +69,12 @@ def parse_event(
     end = resource.get("end") or {}
     summary = str(resource.get("summary") or "(no title)").replace("\n", " ")
     event_id = str(resource.get("id") or "")
+    organizer_info = resource.get("organizer") or {}
+    organizer = None
+    if organizer_info and not organizer_info.get("self"):
+        organizer = str(
+            organizer_info.get("displayName") or organizer_info.get("email") or ""
+        ) or None
     if start.get("date") and not start.get("dateTime"):
         return CalEvent(
             event_id=event_id,
@@ -77,6 +84,7 @@ def parse_event(
             all_day=True,
             account=account,
             source=source,
+            organizer=organizer,
         )
     start_raw = str(start.get("dateTime") or "")
     end_raw = str(end.get("dateTime") or "")
@@ -90,6 +98,7 @@ def parse_event(
         all_day=False,
         account=account,
         source=source,
+        organizer=organizer,
     )
 
 
@@ -267,18 +276,20 @@ def render_report(
         "",
         "## Timed",
         "",
-        "| Start | End | Title | Account |",
-        "| --- | --- | --- | --- |",
+        "| Start | End | Title | Account | Organizer |",
+        "| --- | --- | --- | --- | --- |",
     ]
     if timed:
         for event in timed:
             assert event.start is not None and event.end is not None
             title = event.summary.replace("|", "/")
+            organizer = (event.organizer or "you").replace("|", "/")
             lines.append(
-                f"| {hhmm(event.start)} | {hhmm(event.end)} | {title} | {event.account} |"
+                f"| {hhmm(event.start)} | {hhmm(event.end)} | {title} | "
+                f"{event.account} | {organizer} |"
             )
     else:
-        lines.append("| — | — | (none) | — |")
+        lines.append("| — | — | (none) | — | — |")
     lines.extend(["", "## All-day", ""])
     if all_day:
         for event in all_day:

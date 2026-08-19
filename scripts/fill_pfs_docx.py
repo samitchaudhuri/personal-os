@@ -33,9 +33,12 @@ except ImportError:
     print("fill_pfs_docx.py requires openpyxl: pip install openpyxl", file=sys.stderr)
     sys.exit(1)
 
-DEFAULT_PFS_DIR = Path(
-    "/Users/samit/Library/CloudStorage/GoogleDrive-samit.chaudhuri@gmail.com"
-    "/My Drive/Work/Franchise/Ultimate Longevity/Personal/Personal Financial Statements"
+# Reached via personal-os/gdrive (repo symlink) rather than the absolute
+# CloudStorage path, so this works across machines/clones without editing.
+# Override with --pfs-dir if the gdrive symlink is not present on this machine.
+DEFAULT_PFS_DIR = (
+    Path(__file__).resolve().parent.parent
+    / "gdrive" / "private" / "ULC-personal" / "Personal" / "Personal Financial Statements"
 )
 
 

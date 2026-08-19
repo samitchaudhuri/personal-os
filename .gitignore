@@ -57,6 +57,9 @@ presentations/build/
 
 .claude/*
 !.claude/skills
+!.claude/settings.json
+!.claude/hooks
+!.claude/hooks/*
 
 # If rules should also be selective:
 # !.cursor/rules/*.mdc

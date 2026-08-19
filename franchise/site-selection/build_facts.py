@@ -233,6 +233,9 @@ def main():
         cfg = yaml.safe_load(f)
 
     base = cfg["drive_base"]
+    if not os.path.isabs(base):
+        # personal-os repo root is two levels up from this script (franchise/site-selection/).
+        base = os.path.join(os.path.dirname(__file__), "..", "..", base)
     comp_dir = os.path.join(base, cfg["comparison_dir"])
     manual_path = os.path.join(comp_dir, cfg["manual_file"])
     out_path = os.path.join(comp_dir, cfg["output_file"])

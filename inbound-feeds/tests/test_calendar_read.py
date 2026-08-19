@@ -38,6 +38,7 @@ def _event(**kwargs) -> cal.CalEvent:
         all_day=False,
         account="ulc",
         source="ulc_calendar",
+        organizer=None,
     )
     defaults.update(kwargs)
     return cal.CalEvent(**defaults)
@@ -97,6 +98,42 @@ class TestParseEvent(unittest.TestCase):
             )
         )
 
+    def test_organizer_captured_when_not_self(self):
+        event = cal.parse_event(
+            {
+                "id": "org",
+                "summary": "Weekly Touch Base",
+                "organizer": {
+                    "email": "anson.switzer@morrowhill.com",
+                    "displayName": "Anson Switzer",
+                    "self": False,
+                },
+                "start": {"dateTime": "2026-08-13T11:30:00-07:00"},
+                "end": {"dateTime": "2026-08-13T12:00:00-07:00"},
+            },
+            account="ulc",
+            source="ulc_calendar",
+            tz=TZ,
+        )
+        assert event is not None
+        self.assertEqual(event.organizer, "Anson Switzer")
+
+    def test_organizer_none_when_self(self):
+        event = cal.parse_event(
+            {
+                "id": "self",
+                "summary": "Focus block",
+                "organizer": {"email": "samit@example.com", "self": True},
+                "start": {"dateTime": "2026-08-13T10:00:00-07:00"},
+                "end": {"dateTime": "2026-08-13T10:30:00-07:00"},
+            },
+            account="ulc",
+            source="ulc_calendar",
+            tz=TZ,
+        )
+        assert event is not None
+        self.assertIsNone(event.organizer)
+
 
 class TestFreeBlocks(unittest.TestCase):
     def test_gap_around_one_meeting(self):
@@ -150,6 +187,13 @@ class TestRender(unittest.TestCase):
             events=[
                 _event(summary="Michael"),
                 _event(
+                    event_id="c",
+                    summary="Anson sync",
+                    start=_dt(13),
+                    end=_dt(13, 30),
+                    organizer="Anson Switzer",
+                ),
+                _event(
                     event_id="d",
                     summary="Holiday",
                     start=None,
@@ -166,6 +210,8 @@ class TestRender(unittest.TestCase):
         self.assertIn("accounts: ulc, personal", text)
         self.assertIn("## Timed", text)
         self.assertIn("Michael", text)
+        self.assertIn("| Anson sync | ulc | Anson Switzer |", text)
+        self.assertIn("| Michael | ulc | you |", text)
         self.assertIn("## All-day", text)
         self.assertIn("Holiday", text)
         self.assertIn("## Free blocks", text)

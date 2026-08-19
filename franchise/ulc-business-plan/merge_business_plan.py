@@ -48,9 +48,9 @@ PLACEHOLDER_MAP: list[tuple[str, str]] = [
     ("[X]", "breakeven_months"),
 ]
 
-DEFAULT_BASE = Path(
-    "/Users/samit/Library/CloudStorage/GoogleDrive-samit.chaudhuri@gmail.com/"
-    "My Drive/Work/Franchise/Ultimate Longevity/Finance/Underwriting"
+DEFAULT_BASE = (
+    Path(__file__).parent.parent.parent
+    / "gdrive" / "private" / "ULC-personal" / "Finance" / "Underwriting"
 )
 
 

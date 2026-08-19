@@ -48,7 +48,7 @@ python3 -m venv .venv
 
 `config.yaml` is the authoritative home for the tunable numbers (income/pop/age
 cutoffs, affordability ceiling, the four weights, ring priority) and the Drive
-path (`drive_base` → `gdrive/shared/ULC/Development/Site Selection/Candidates`
+path (`drive_base` → `gdrive/private/ULC-personal/Development/Site Selection/Candidates`
 via the repo symlink). Change behavior there, not in the code.
 
 ## Spec & tests (start here if it breaks)

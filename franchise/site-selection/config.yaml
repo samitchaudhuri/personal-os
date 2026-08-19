@@ -5,8 +5,10 @@
 
 # Data lives in Google Drive (L1 PDFs + manual_facts.csv + combined_facts.csv),
 # reached via personal-os/gdrive (repo symlink). Code + this config live in git.
-# Override drive_base only if the gdrive symlink is not present on this machine.
-drive_base: "/Users/samit/work/personal-os/gdrive/shared/ULC/Development/Site Selection/Candidates"
+# Relative paths resolve against the personal-os repo root, not the cwd at
+# invocation. Use an absolute path instead only if the gdrive symlink target
+# needs to differ from the repo-relative default on a given machine.
+drive_base: "gdrive/private/ULC-personal/Development/Site Selection/Candidates"
 comparison_dir: "_comparison"
 manual_file: "manual_facts.csv"
 output_file: "combined_facts.csv"
