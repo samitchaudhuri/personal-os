@@ -71,19 +71,13 @@ class TestParseReport(unittest.TestCase):
         self.assertEqual(self.d["fitness_centers_3mi"], 104)
 
     def test_ai_score_and_households(self):
-        self.assertEqual(self.d["ai_report_score"], 81)
+        self.assertEqual(self.d["ai_score"], 81)
         self.assertEqual(self.d["hh_3mi"], 70000)
 
     def test_empty_text_is_all_none(self):
         empty = bf.parse_report_text("")
         self.assertTrue(all(v is None for v in empty.values()))
         self.assertEqual(set(empty), set(bf.REPORT_FIELDS))
-
-
-class TestParseOverview(unittest.TestCase):
-    def test_ai_score(self):
-        self.assertEqual(bf.parse_overview_text("**VT AI Score: 81**")["ai_score"], 81)
-        self.assertIsNone(bf.parse_overview_text("no score here")["ai_score"])
 
 
 class TestCompute(unittest.TestCase):
@@ -116,8 +110,18 @@ class TestCompute(unittest.TestCase):
     def test_gate_todo_when_missing(self):
         r = self._row(sf_target="2000", base_psf="60", nnn_psf="TODO")
         bf.compute(r, self.cfg)
-        self.assertEqual(r["allin_month"], "TODO")
+        self.assertEqual(r["total_rent"], "TODO")
         self.assertEqual(r["gate_afford"], "TODO")
+
+    def test_total_ti(self):
+        r = self._row(sf_target="2399", ti_psf="85")
+        bf.compute(r, self.cfg)
+        self.assertEqual(r["total_ti"], "203915")
+
+    def test_total_ti_todo_when_missing(self):
+        r = self._row(sf_target="2399", ti_psf="TODO")
+        bf.compute(r, self.cfg)
+        self.assertEqual(r["total_ti"], "TODO")
 
     def test_flags(self):
         r = self._row(med_income_3mi="170000", pop_3mi="190000", med_age_3mi="42",

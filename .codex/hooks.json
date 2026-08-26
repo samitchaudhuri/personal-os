@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "'/Users/samit/work/personal-os/.codex/hooks/thread-reminder.sh'"
+          }
+        ]
+      }
+    ]
+  }
+}

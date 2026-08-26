@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """Build combined_facts.csv for ULC site selection (lever 2, config-driven).
 
-Reads L1 (VisionTrack Overview `_page.md` + `Site Report*.pdf`) for demographics
-and AI scores, merges the human-authored `manual_facts.csv` (identity, lease
-economics, co-tenants/notes, Placer reads, 1-7 scores), computes the derived
-columns, and writes `combined_facts.csv`.
+Reads L1 (`Site Report*.pdf`) for demographics and AI score, merges the
+human-authored `manual_facts.csv` (identity, lease economics, co-tenants/notes,
+Placer reads, 1-7 scores), computes the derived columns, and writes
+`combined_facts.csv`.
 
 This script is the ONLY writer of combined_facts.csv. You author L1 (the VT
 files) and manual_facts.csv; everything else is generated here. Tunables live in
@@ -31,8 +31,9 @@ except ImportError:  # pragma: no cover
 
 # Output column order (matches the existing combined_facts.csv schema).
 COLUMNS = [
-    "site", "address", "territory", "ai_score", "ai_report_score",
-    "sf_target", "base_psf", "nnn_psf", "generation", "allin_month", "gate_afford",
+    "site", "address", "territory", "ai_score",
+    "sf_target", "total_rent", "total_ti", "base_psf", "nnn_psf", "ti_psf",
+    "generation", "gate_afford",
     "pop_1mi", "pop_3mi", "pop_5mi", "hh_3mi",
     "med_income_1mi", "med_income_3mi", "med_income_5mi", "avg_income_3mi",
     "med_age_3mi", "age_25_49_3mi", "age_50_64_3mi", "age_65plus_3mi",
@@ -47,7 +48,7 @@ COLUMNS = [
 
 # Columns copied verbatim from manual_facts.csv (human-authored).
 MANUAL_PASSTHROUGH = [
-    "address", "territory", "sf_target", "base_psf", "nnn_psf", "generation",
+    "address", "territory", "sf_target", "base_psf", "nnn_psf", "ti_psf", "generation",
     "co_tenants", "notes",
     "placer_source", "placer_mon", "placer_tue", "placer_wed", "placer_thu",
     "placer_fri", "placer_sat", "placer_sun",
@@ -104,29 +105,12 @@ def fmt(v):
 
 
 REPORT_FIELDS = [
-    "ai_report_score", "pop_1mi", "pop_3mi", "pop_5mi", "hh_3mi",
+    "ai_score", "pop_1mi", "pop_3mi", "pop_5mi", "hh_3mi",
     "med_income_1mi", "med_income_3mi", "med_income_5mi", "avg_income_3mi",
     "med_age_3mi", "age_25_49_3mi", "age_50_64_3mi", "age_65plus_3mi",
     "pct_income_150k_3mi", "cagr_hist_3mi", "cagr_proj_3mi", "daytime_3mi",
     "fitness_centers_3mi",
 ]
-
-
-def parse_overview_text(text):
-    """Pure: extract the VT web AI score from Overview text (testable without a file)."""
-    out = {"ai_score": None}
-    m = re.search(r"VT AI Score:\s*(\d+)", text or "")
-    if m:
-        out["ai_score"] = int(m.group(1))
-    return out
-
-
-def read_overview(path):
-    """Read `_page.md` and parse it (lease econ comes from manual, not here)."""
-    if not path or not os.path.exists(path):
-        return parse_overview_text("")
-    with open(path, encoding="utf-8") as f:
-        return parse_overview_text(f.read())
 
 
 def read_site_report(path):
@@ -168,7 +152,7 @@ def parse_report_text(text):
         out["pct_income_150k_3mi"] = float(m.group(2))
     m = re.search(r"(?m)^\s*(\d{2,3})\s+This model was trained", text)
     if m:
-        out["ai_report_score"] = int(m.group(1))
+        out["ai_score"] = int(m.group(1))
     return out
 
 
@@ -179,7 +163,13 @@ def compute(row, cfg):
     allin = None
     if None not in (base, nnn, sf):
         allin = int(round((base + nnn) * sf / 12))
-    row["allin_month"] = fmt(allin)
+    row["total_rent"] = fmt(allin)
+
+    ti, sf_ti = parse_num(row.get("ti_psf")), parse_num(row.get("sf_target"))
+    total_ti = None
+    if None not in (ti, sf_ti):
+        total_ti = int(round(ti * sf_ti))
+    row["total_ti"] = fmt(total_ti)
 
     if allin is None:
         row["gate_afford"] = "TODO"
@@ -257,7 +247,6 @@ def main():
     for slug in slugs:
         folder = os.path.join(base, slug)
         display = names.get(slug, slug)
-        overview_path = os.path.join(folder, "_page.md")
         reports = glob.glob(os.path.join(folder, "Site Report*.pdf"))
 
         row = {c: "" for c in COLUMNS}
@@ -266,9 +255,7 @@ def main():
         for c in MANUAL_PASSTHROUGH:
             row[c] = (man.get(c) or "").strip()
 
-        ov = read_overview(overview_path)
         sr = read_site_report(reports[0] if reports else None)  # None -> all TODO
-        row["ai_score"] = fmt(ov.get("ai_score")) if ov.get("ai_score") is not None else fmt(sr.get("ai_report_score"))
         for k, v in sr.items():
             row[k] = fmt(v)
 

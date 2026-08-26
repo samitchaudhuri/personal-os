@@ -13,7 +13,7 @@ See the method + design note in the vault:
 | Layer | Lives in | Written by |
 | --- | --- | --- |
 | Code + config (this folder) | git (`personal-os`) | you / agent |
-| L1 raw: `<site>/_page.md`, `<site>/Site Report*.pdf` | Google Drive | you (paste/download from VT) |
+| L1 raw: `<site>/Site Report*.pdf` | Google Drive | you (download from VT) |
 | Human input: `_comparison/manual_facts.csv` | Google Drive | you |
 | Generated: `_comparison/combined_facts.csv` | Google Drive | this script |
 
@@ -24,9 +24,9 @@ See the method + design note in the vault:
   fitness centers).
 - Authored (from `manual_facts.csv`): identity + lease economics + judgment that
   VT states ambiguously or not at all — `address, territory, sf_target,
-  base_psf, nnn_psf, generation, co_tenants, notes`, the seven `placer_*` daily
+  base_psf, nnn_psf, ti_psf, generation, co_tenants, notes`, the seven `placer_*` daily
   reads, and the four `score_*` (1-7) values.
-- Computed (here): `allin_month`, `gate_afford`, the four `flag_*`,
+- Computed (here): `total_rent`, `total_ti`, `gate_afford`, the four `flag_*`,
   `placer_weekend_ratio`, `placer_pattern`, `composite`.
 
 A field the parser can't find is written as `TODO` (demographics) or left blank
@@ -96,9 +96,10 @@ What they pin down:
 
 Formulas (also enforced by the tests):
 
-- `allin_month = round((base_psf + nnn_psf) * sf_target / 12)`
-- `gate_afford`: `pass` if `allin <= afford_ceiling_hard`; `borderline` if within
-  `afford_borderline_pct` over it; else `fail`; `TODO` if `allin` unknown.
+- `total_rent = round((base_psf + nnn_psf) * sf_target / 12)`
+- `total_ti = round(ti_psf * sf_target)`
+- `gate_afford`: `pass` if `total_rent <= afford_ceiling_hard`; `borderline` if within
+  `afford_borderline_pct` over it; else `fail`; `TODO` if `total_rent` unknown.
 - `placer_weekend_ratio = avg(Sat,Sun) / avg(Mon..Fri)`; `placer_pattern =
   weekend-spike` if ratio > `placer.weekend_spike_ratio`, else `uniform`.
 - `composite = neighbor*w_n + customer*w_c + resid*w_r + visibility*w_v`.
@@ -112,7 +113,7 @@ pdfplumber, then update the golden values in `TestParseReport`.
 
 ## Adding a new candidate
 
-1. Create `Candidates/<slug>/` in Drive; drop in `_page.md` and `Site Report*.pdf`.
+1. Create `Candidates/<slug>/` in Drive; drop in `Site Report*.pdf`.
 2. Add the display name under `site_names` in `config.yaml` (keyed by `<slug>`).
 3. Add a row to `manual_facts.csv` (identity, lease, co-tenants, notes; placer +
    scores when you have them).
