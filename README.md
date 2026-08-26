@@ -14,7 +14,6 @@ Brain dump into `BACKLOG.md`, tell your AI assistant to process it, and get orga
 | Goal-driven Prioritization | ✅ |
 | Knowledge Base | ✅ |
 | Backlog Processing | ✅ |
-| Session Evals | ✅ |
 | MCP Server (optional) | ✅ |
 
 ---
