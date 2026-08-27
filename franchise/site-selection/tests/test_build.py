@@ -167,6 +167,19 @@ class TestCompute(unittest.TestCase):
         self.assertEqual(r["psf_bo"], "TODO")
         self.assertEqual(r["total_bo"], "TODO")
 
+    def test_buildout_estimate_second_gen_fallback(self):
+        r = self._row(sf_target="2247", shell="TODO", gen="Second")
+        bf.compute(r, self.cfg)
+        self.assertEqual(r["psf_bo"], "140")
+        self.assertEqual(r["total_bo"], "314580")
+
+    def test_buildout_estimate_todo_when_first_gen_shell_unknown(self):
+        # First-gen with an unclassified shell still has no fallback rate.
+        r = self._row(sf_target="2247", shell="TODO", gen="First")
+        bf.compute(r, self.cfg)
+        self.assertEqual(r["psf_bo"], "TODO")
+        self.assertEqual(r["total_bo"], "TODO")
+
     def test_bo_net_is_buildout_minus_ti(self):
         r = self._row(sf_target="2348", shell="cold_dark", psf_ti="130")
         bf.compute(r, self.cfg)

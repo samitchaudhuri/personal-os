@@ -217,6 +217,8 @@ def compute(row, cfg):
     row["total_ti"] = fmt(total_ti)
 
     bo_rate = cfg.get("buildout_psf_by_shell", {}).get(row.get("shell"))
+    if bo_rate is None and row.get("gen") == "Second":
+        bo_rate = cfg.get("buildout_psf_second_gen")
     row["psf_bo"] = fmt(bo_rate)
     total_bo = None
     if None not in (bo_rate, sf):

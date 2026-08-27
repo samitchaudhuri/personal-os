@@ -43,6 +43,12 @@ buildout_psf_by_shell:
   grey: 160        # "splits the difference" pending the work letter (Anson)
   vanilla: 150
 
+# Second-gen (existing improvements) budgeting figure (Anson Switzer,
+# 2026-08-27): no shell breakdown applies since there's no raw-shell delivery,
+# but this is his "put in $X/sf and should be ok, can vary" number for
+# budgeting purposes. Used only when shell is unclassified and gen == "2".
+buildout_psf_second_gen: 140
+
 # Ring read priority for demographics (primary first).
 ring_priority: ["3mi", "5mi", "1mi"]
 
