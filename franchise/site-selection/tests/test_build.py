@@ -80,6 +80,33 @@ class TestParseReport(unittest.TestCase):
         self.assertEqual(set(empty), set(bf.REPORT_FIELDS))
 
 
+class TestParseDeliveryShell(unittest.TestCase):
+    def test_cold_dark(self):
+        text = "#### **About the Space**\n\n- Clear Heights: 10'\n- Delivery: Cold Dark Shell Condition\n- Parking: Street\n"
+        self.assertEqual(bf.parse_delivery_shell(text), "cold_dark")
+
+    def test_grey_beats_warm(self):
+        text = "- Delivery: Warm Grey Shell Condition\n"
+        self.assertEqual(bf.parse_delivery_shell(text), "grey")
+
+    def test_warm_only_is_vanilla(self):
+        text = "- Delivery: Warm Shell Condition\n"
+        self.assertEqual(bf.parse_delivery_shell(text), "vanilla")
+
+    def test_bullet_order_independent_of_header_delivery_line(self):
+        # The Overview header repeats "Delivery**First Generation**" above the
+        # About the Space section; only the bulleted line should be classified.
+        text = "Delivery**First Generation**\n\n#### **About the Space**\n\n- Delivery: Cold Dark Shell\n"
+        self.assertEqual(bf.parse_delivery_shell(text), "cold_dark")
+
+    def test_second_gen_has_no_bullet(self):
+        text = "Delivery**Second Generation**\n\n#### **About the Space**\n\n- Previous Tenant: Nail Salon\n"
+        self.assertIsNone(bf.parse_delivery_shell(text))
+
+    def test_empty_text(self):
+        self.assertIsNone(bf.parse_delivery_shell(""))
+
+
 class TestCompute(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -114,14 +141,44 @@ class TestCompute(unittest.TestCase):
         self.assertEqual(r["gate_afford"], "TODO")
 
     def test_total_ti(self):
-        r = self._row(sf_target="2399", ti_psf="85")
+        r = self._row(sf_target="2399", psf_ti="85")
         bf.compute(r, self.cfg)
         self.assertEqual(r["total_ti"], "203915")
 
     def test_total_ti_todo_when_missing(self):
-        r = self._row(sf_target="2399", ti_psf="TODO")
+        r = self._row(sf_target="2399", psf_ti="TODO")
         bf.compute(r, self.cfg)
         self.assertEqual(r["total_ti"], "TODO")
+
+    def test_psf_rent_is_base_plus_nnn(self):
+        r = self._row(base_psf="39", nnn_psf="16.08")
+        bf.compute(r, self.cfg)
+        self.assertEqual(r["psf_rent"], "55.08")
+
+    def test_buildout_estimate_by_shell(self):
+        r = self._row(sf_target="2247", shell="cold_dark")
+        bf.compute(r, self.cfg)
+        self.assertEqual(r["psf_bo"], "175")
+        self.assertEqual(r["total_bo"], "393225")
+
+    def test_buildout_estimate_todo_when_shell_unknown(self):
+        r = self._row(sf_target="2247", shell="TODO")
+        bf.compute(r, self.cfg)
+        self.assertEqual(r["psf_bo"], "TODO")
+        self.assertEqual(r["total_bo"], "TODO")
+
+    def test_bo_net_is_buildout_minus_ti(self):
+        r = self._row(sf_target="2348", shell="cold_dark", psf_ti="130")
+        bf.compute(r, self.cfg)
+        # total_bo = 175*2348 = 410900; total_ti = 130*2348 = 305240
+        self.assertEqual(r["total_bo"], "410900")
+        self.assertEqual(r["total_ti"], "305240")
+        self.assertEqual(r["bo_net"], "105660")
+
+    def test_bo_net_todo_when_either_side_missing(self):
+        r = self._row(sf_target="2000", shell="vanilla", psf_ti="TODO")
+        bf.compute(r, self.cfg)
+        self.assertEqual(r["bo_net"], "TODO")
 
     def test_flags(self):
         r = self._row(med_income_3mi="170000", pop_3mi="190000", med_age_3mi="42",

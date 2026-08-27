@@ -33,6 +33,16 @@ weights:
 placer:
   weekend_spike_ratio: 1.3      # ratio above this => "weekend-spike", else "uniform"
 
+# Build-out cost estimate by shell type (Anson Switzer, 2026-08-26). Coarse
+# pre-TI planning figure for candidates without a negotiated ti_psf yet (e.g.
+# early SF-Marin sites); once a real ti_psf lands, that figure is the one to
+# trust. Shell type is read from each site's _page.md, "About the Space" ->
+# "Delivery" bullet (first-gen sites only; second-gen sites don't carry one).
+buildout_psf_by_shell:
+  cold_dark: 175
+  grey: 160        # "splits the difference" pending the work letter (Anson)
+  vanilla: 150
+
 # Ring read priority for demographics (primary first).
 ring_priority: ["3mi", "5mi", "1mi"]
 

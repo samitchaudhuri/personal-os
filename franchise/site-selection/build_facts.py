@@ -31,9 +31,12 @@ except ImportError:  # pragma: no cover
 
 # Output column order (matches the existing combined_facts.csv schema).
 COLUMNS = [
-    "site", "address", "territory", "ai_score",
-    "sf_target", "total_rent", "total_ti", "base_psf", "nnn_psf", "ti_psf",
-    "generation", "gate_afford",
+    "site", "address", "ai_score",
+    "sf_target", "gen", "shell",
+    "total_rent", "total_bo", "total_ti", "bo_net",
+    "psf_rent", "psf_bo", "psf_ti",
+    "base_psf", "nnn_psf",
+    "gate_afford",
     "pop_1mi", "pop_3mi", "pop_5mi", "hh_3mi",
     "med_income_1mi", "med_income_3mi", "med_income_5mi", "avg_income_3mi",
     "med_age_3mi", "age_25_49_3mi", "age_50_64_3mi", "age_65plus_3mi",
@@ -46,9 +49,13 @@ COLUMNS = [
     "co_tenants", "notes",
 ]
 
-# Columns copied verbatim from manual_facts.csv (human-authored).
+# Columns copied verbatim from manual_facts.csv (human-authored). `territory`
+# isn't tracked downstream (the G-territory gate was retired), so it's dropped
+# from combined_facts.csv here. `generation` and `ti_psf` are also authored in
+# manual_facts.csv but land under the shorter `gen` / `psf_ti` output names —
+# see the explicit rename in main() instead of listing them here.
 MANUAL_PASSTHROUGH = [
-    "address", "territory", "sf_target", "base_psf", "nnn_psf", "ti_psf", "generation",
+    "address", "sf_target", "base_psf", "nnn_psf",
     "co_tenants", "notes",
     "placer_source", "placer_mon", "placer_tue", "placer_wed", "placer_thu",
     "placer_fri", "placer_sat", "placer_sun",
@@ -156,6 +163,43 @@ def parse_report_text(text):
     return out
 
 
+DELIVERY_BULLET_RE = re.compile(r"(?im)^-\s*Delivery:\s*(.+?)\s*$")
+
+
+def classify_shell(text):
+    """Map a VT 'About the Space' Delivery bullet to Anson's three rate buckets."""
+    t = text.lower()
+    if "cold" in t:
+        return "cold_dark"
+    if "grey" in t or "gray" in t:
+        return "grey"
+    if "warm" in t:
+        return "vanilla"
+    return None
+
+
+def parse_delivery_shell(text):
+    """Pure: find the 'About the Space' Delivery bullet and classify its shell type.
+
+    Second-gen sites typically have no such bullet (existing improvements,
+    not a raw shell) -> None, formatted as TODO downstream.
+    """
+    if not text:
+        return None
+    m = DELIVERY_BULLET_RE.search(text)
+    if not m:
+        return None
+    return classify_shell(m.group(1))
+
+
+def read_page_md(path):
+    """Open the VT _page.md Overview (missing/empty -> no shell classification)."""
+    if not path or not os.path.exists(path):
+        return ""
+    with open(path, encoding="utf-8") as f:
+        return f.read()
+
+
 def compute(row, cfg):
     """Fill computed columns: all-in, gate, flags, placer ratio/pattern, composite."""
     th = cfg["thresholds"]
@@ -164,12 +208,28 @@ def compute(row, cfg):
     if None not in (base, nnn, sf):
         allin = int(round((base + nnn) * sf / 12))
     row["total_rent"] = fmt(allin)
+    row["psf_rent"] = fmt(base + nnn) if None not in (base, nnn) else "TODO"
 
-    ti, sf_ti = parse_num(row.get("ti_psf")), parse_num(row.get("sf_target"))
+    ti, sf_ti = parse_num(row.get("psf_ti")), parse_num(row.get("sf_target"))
     total_ti = None
     if None not in (ti, sf_ti):
         total_ti = int(round(ti * sf_ti))
     row["total_ti"] = fmt(total_ti)
+
+    bo_rate = cfg.get("buildout_psf_by_shell", {}).get(row.get("shell"))
+    row["psf_bo"] = fmt(bo_rate)
+    total_bo = None
+    if None not in (bo_rate, sf):
+        total_bo = int(round(bo_rate * sf))
+    row["total_bo"] = fmt(total_bo)
+
+    # Capital gap: estimated build-out cost minus the landlord's TI allowance.
+    # Positive = the franchisee funds the difference; this is the figure the
+    # guarantor build-out loan question (Anson 8/26) is actually asking about.
+    bo_net = None
+    if None not in (total_bo, total_ti):
+        bo_net = total_bo - total_ti
+    row["bo_net"] = fmt(bo_net)
 
     if allin is None:
         row["gate_afford"] = "TODO"
@@ -254,10 +314,16 @@ def main():
         man = manual.get(display, {})
         for c in MANUAL_PASSTHROUGH:
             row[c] = (man.get(c) or "").strip()
+        row["gen"] = (man.get("generation") or "").strip()
+        row["psf_ti"] = (man.get("ti_psf") or "").strip()
 
         sr = read_site_report(reports[0] if reports else None)  # None -> all TODO
         for k, v in sr.items():
             row[k] = fmt(v)
+
+        page_paths = glob.glob(os.path.join(folder, "_page.md"))
+        page_text = read_page_md(page_paths[0] if page_paths else None)
+        row["shell"] = parse_delivery_shell(page_text) or "TODO"
 
         compute(row, cfg)
 
