@@ -6,13 +6,13 @@ Merges yellow-highlight inputs from the staging markdown into the ULC sample bus
 
 See vault note [[ULC Business Plan Runbook]] for the full picture (three source files → staging → template).
 
-## Files (Google Drive `Finance/Underwriting/`)
+## Files (Google Drive `Finance/Funding Plan/`)
 
 | File | Role |
 | --- | --- |
 | `ULC_FDD2026_Facts.md` | FDD capital and fees |
 | `ULC_Economic_Projections.md` | Operating projections |
-| `ULC_Underwriting_Details.md` | Manual package facts |
+| `ULC_Funding_Plan_Details.md` | Manual package facts |
 | `ULC_Business_Plan_Staging.md` | Temporary yellow-field assembly (merge input) |
 | `ULC_Sample Business Plan.docx` | Read-only template |
 | `Chaudhuri_ULC_Site1_Business_Plan.docx` | Generated output |

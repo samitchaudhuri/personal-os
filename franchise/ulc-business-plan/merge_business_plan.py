@@ -50,7 +50,7 @@ PLACEHOLDER_MAP: list[tuple[str, str]] = [
 
 DEFAULT_BASE = (
     Path(__file__).parent.parent.parent
-    / "gdrive" / "private" / "ULC-personal" / "Finance" / "Underwriting"
+    / "gdrive" / "private" / "ULC-personal" / "Finance" / "Funding Plan"
 )
 
 
