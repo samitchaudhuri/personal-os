@@ -70,8 +70,8 @@ class TestParseReport(unittest.TestCase):
         self.assertEqual(self.d["pct_income_150k_3mi"], 54.6)
         self.assertEqual(self.d["fitness_centers_3mi"], 104)
 
-    def test_ai_score_and_households(self):
-        self.assertEqual(self.d["ai_score"], 81)
+    def test_vt_score_and_households(self):
+        self.assertEqual(self.d["vt_score"], 81)
         self.assertEqual(self.d["hh_3mi"], 70000)
 
     def test_empty_text_is_all_none(self):
@@ -231,18 +231,31 @@ class TestCompute(unittest.TestCase):
         self.assertEqual(r["placer_pattern"], "")
 
     def test_composite(self):
-        r = self._row(score_neighbor="6", score_customer="5", score_resid="4", score_visibility="7")
+        r = self._row(neigh_score="6", cust_score="5", resid_score="4", visib_score="7")
         bf.compute(r, self.cfg)
         # 0.30*6 + 0.25*5 + 0.25*4 + 0.20*7 = 1.8 + 1.25 + 1.0 + 1.4 = 5.45
         self.assertEqual(r["composite"], "5.45")
 
     def test_composite_blank_until_scored(self):
-        r = self._row(score_neighbor="6")  # incomplete
+        r = self._row(neigh_score="6")  # incomplete
         bf.compute(r, self.cfg)
         self.assertEqual(r["composite"], "")
 
     def test_weights_sum_to_one(self):
         self.assertAlmostEqual(sum(self.cfg["weights"].values()), 1.0, places=6)
+
+
+class TestCompositeSortKey(unittest.TestCase):
+    def test_sorts_descending_with_blanks_last(self):
+        rows = [
+            {"composite": "4.7"},
+            {"composite": "5.5"},
+            {"composite": "TODO"},
+            {"composite": "5.2"},
+            {"composite": ""},
+        ]
+        rows.sort(key=bf.composite_sort_key)
+        self.assertEqual([r["composite"] for r in rows], ["5.5", "5.2", "4.7", "TODO", ""])
 
 
 if __name__ == "__main__":

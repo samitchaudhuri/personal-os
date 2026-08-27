@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover
 
 # Output column order (matches the existing combined_facts.csv schema).
 COLUMNS = [
-    "site", "address", "ai_score",
+    "site", "address", "composite", "vt_score",
     "sf_target", "gen", "shell",
     "total_rent", "total_bo", "total_ti", "bo_net",
     "psf_rent", "psf_bo", "psf_ti",
@@ -45,7 +45,7 @@ COLUMNS = [
     "flag_income_150k", "flag_pop_100k", "flag_age_40plus", "flag_cagr",
     "placer_source", "placer_mon", "placer_tue", "placer_wed", "placer_thu",
     "placer_fri", "placer_sat", "placer_sun", "placer_weekend_ratio", "placer_pattern",
-    "score_neighbor", "score_customer", "score_resid", "score_visibility", "composite",
+    "neigh_score", "cust_score", "resid_score", "visib_score",
     "co_tenants", "notes",
 ]
 
@@ -59,7 +59,7 @@ MANUAL_PASSTHROUGH = [
     "co_tenants", "notes",
     "placer_source", "placer_mon", "placer_tue", "placer_wed", "placer_thu",
     "placer_fri", "placer_sat", "placer_sun",
-    "score_neighbor", "score_customer", "score_resid", "score_visibility",
+    "neigh_score", "cust_score", "resid_score", "visib_score",
 ]
 
 PLACER_DAYS = ["placer_mon", "placer_tue", "placer_wed", "placer_thu",
@@ -112,7 +112,7 @@ def fmt(v):
 
 
 REPORT_FIELDS = [
-    "ai_score", "pop_1mi", "pop_3mi", "pop_5mi", "hh_3mi",
+    "vt_score", "pop_1mi", "pop_3mi", "pop_5mi", "hh_3mi",
     "med_income_1mi", "med_income_3mi", "med_income_5mi", "avg_income_3mi",
     "med_age_3mi", "age_25_49_3mi", "age_50_64_3mi", "age_65plus_3mi",
     "pct_income_150k_3mi", "cagr_hist_3mi", "cagr_proj_3mi", "daytime_3mi",
@@ -159,7 +159,7 @@ def parse_report_text(text):
         out["pct_income_150k_3mi"] = float(m.group(2))
     m = re.search(r"(?m)^\s*(\d{2,3})\s+This model was trained", text)
     if m:
-        out["ai_score"] = int(m.group(1))
+        out["vt_score"] = int(m.group(1))
     return out
 
 
@@ -265,7 +265,7 @@ def compute(row, cfg):
         row["placer_pattern"] = ""
 
     w = cfg["weights"]
-    scores = [parse_num(row.get(k)) for k in ("score_neighbor", "score_customer", "score_resid", "score_visibility")]
+    scores = [parse_num(row.get(k)) for k in ("neigh_score", "cust_score", "resid_score", "visib_score")]
     if all(s is not None for s in scores):
         comp = (w["neighbor"] * scores[0] + w["customer"] * scores[1]
                 + w["resid"] * scores[2] + w["visibility"] * scores[3])
@@ -273,6 +273,12 @@ def compute(row, cfg):
     else:
         row["composite"] = ""
     return row
+
+
+def composite_sort_key(row):
+    """Sort by composite descending; rows with no composite yet (TODO/blank) sort last."""
+    val = parse_num(row.get("composite"))
+    return (val is None, -val if val is not None else 0)
 
 
 def main():
@@ -334,6 +340,8 @@ def main():
         if display not in manual:
             warnings.append(f"{display}: no manual_facts.csv row (lease/text/placer blank)")
         rows.append(row)
+
+    rows.sort(key=composite_sort_key)
 
     for w in warnings:
         print(f"WARN: {w}", file=sys.stderr)
