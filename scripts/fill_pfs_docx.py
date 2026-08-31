@@ -14,7 +14,7 @@ Example:
     --date 6/23/2026
 
 The script reads the empty layout master Chaudhuri_PFS_Template.docx (never write
-script output back to that file). See vault/Notes/PFS Generation Runbook.md.
+script output back to that file). See vault/Agent/Workflows/Personal Financial Statement (PFS).md.
 """
 
 from __future__ import annotations
