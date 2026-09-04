@@ -15,7 +15,8 @@ that point, and writes the before/contribution/after tables into the PDF's
 form fields. Signature and Date fields are left blank -- those still get
 filled by hand when the form is printed and signed.
 
-Requires: openpyxl, pypdf (pip install openpyxl pypdf)
+Requires: openpyxl, pypdf — see scripts/requirements.txt; run via scripts/.venv
+  (python3 -m venv scripts/.venv && scripts/.venv/bin/pip install -r scripts/requirements.txt)
 
 Example:
   python scripts/fill_capital_contribution.py --entity sustain
@@ -51,6 +52,9 @@ GOV_DIR = (
     Path(__file__).resolve().parent.parent
     / "gdrive" / "private" / "ULC-personal" / "Governance" / "Entity Structure" / "Organizational Meeting"
 )
+# The blank NW template is entity-agnostic (byte-identical across entities),
+# so it lives once at Entity Structure/Templates rather than per-entity.
+TEMPLATE_STEM = "CAPITAL_CONTRIBUTION_TEMPLATE_2026-08-31"
 
 # Per-entity facts that don't live in the ledger .xlsx (from the CA Articles
 # of Organization, both filed 2026-08-14).
@@ -58,7 +62,7 @@ ENTITIES = {
     "holdings": {
         "folder": "MSC Holdings",
         "ledger_stem": "MSC_HOLDINGS_MEMBERSHIP_LEDGER",
-        "template_stem": "MSC_HOLDINGS_CAPITAL_CONTRIBUTION_TEMPLATE_2026-08-31",
+        "output_stem": "MSC_HOLDINGS_CAPITAL_CONTRIBUTION",
         "name": "MSC Holdings LLC",
         "state": "California",
         "formed": date(2026, 8, 14),
@@ -66,7 +70,7 @@ ENTITIES = {
     "sustain": {
         "folder": "MSC Sustain",
         "ledger_stem": "MSC_SUSTAIN_MEMBERSHIP_LEDGER",
-        "template_stem": "MSC_SUSTAIN_CAPITAL_CONTRIBUTION_TEMPLATE_2026-08-31",
+        "output_stem": "MSC_SUSTAIN_CAPITAL_CONTRIBUTION",
         "name": "MSC Sustain LLC",
         "state": "California",
         "formed": date(2026, 8, 14),
@@ -172,13 +176,17 @@ def ownership_as_of(transfer_rows: list[tuple], as_of: date) -> dict[str, float]
 def find_target_date(capital_rows: list[tuple], explicit: date | None) -> date:
     if explicit:
         return explicit
+    # A contribution row with no Doc filename yet is "pending" -- the runbook
+    # says to leave Doc blank when logging one, so blank and the literal word
+    # both count (a still-in-progress .xlsx might have "pending" typed in).
     pending = [
-        to_date(dt) for dt, _typ, _member, _amount, doc, _notes in capital_rows
-        if str(doc or "").strip().lower().startswith("pending")
+        to_date(dt) for dt, typ, _member, _amount, doc, _notes in capital_rows
+        if str(typ).strip().lower().startswith("contrib")
+        and (not str(doc or "").strip() or str(doc).strip().lower().startswith("pending"))
     ]
     if not pending:
         raise ValueError(
-            "No Capital row has a 'pending' Doc cell and no --date was given -- "
+            "No Contribution row has a blank/'pending' Doc cell and no --date was given -- "
             "pass --date YYYY-MM-DD for the contribution to fill."
         )
     return max(pending)
@@ -264,9 +272,11 @@ def main() -> None:
     if args.entity:
         entity_dir = GOV_DIR / entity["folder"]
         xlsx = args.xlsx or entity_dir / f"{entity['ledger_stem']}.xlsx"
-        template = args.template or entity_dir / f"{entity['template_stem']}.pdf"
+        template = args.template or GOV_DIR.parent / "Templates" / f"{TEMPLATE_STEM}.pdf"
+        output_dir = entity_dir
     else:
         xlsx, template = args.xlsx, args.template
+        output_dir = template.parent if template else None
     if args.name:
         entity["name"] = args.name
     if args.state:
@@ -302,8 +312,8 @@ def main() -> None:
     if args.output:
         output = args.output
     else:
-        stem = template.stem.split("_TEMPLATE")[0]
-        output = template.parent / f"{stem}_{target_date}.pdf"
+        stem = entity.get("output_stem") or template.stem.split("_TEMPLATE")[0]
+        output = output_dir / f"{stem}_{target_date}.pdf"
 
     fill_pdf(template, output, fields)
 

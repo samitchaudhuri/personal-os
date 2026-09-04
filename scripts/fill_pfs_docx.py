@@ -4,7 +4,8 @@
 Reads PFS Map, Schedules, and Meta tabs; inserts values into Chaudhuri_PFS_Template.docx
 (empty layout master) by w14:paraId without reserializing document.xml (preserves Word namespaces).
 
-Requires: openpyxl (pip install openpyxl)
+Requires: openpyxl — see scripts/requirements.txt; run via scripts/.venv
+  (python3 -m venv scripts/.venv && scripts/.venv/bin/pip install -r scripts/requirements.txt)
 
 Example:
   python scripts/fill_pfs_docx.py \\
