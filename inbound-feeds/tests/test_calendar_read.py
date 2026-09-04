@@ -39,6 +39,7 @@ def _event(**kwargs) -> cal.CalEvent:
         account="ulc",
         source="ulc_calendar",
         organizer=None,
+        attendee_count=0,
     )
     defaults.update(kwargs)
     return cal.CalEvent(**defaults)
@@ -133,6 +134,48 @@ class TestParseEvent(unittest.TestCase):
         )
         assert event is not None
         self.assertIsNone(event.organizer)
+
+    def test_attendee_count_excludes_self_organizer_and_resources(self):
+        event = cal.parse_event(
+            {
+                "id": "att",
+                "summary": "Biweekly sync",
+                "organizer": {
+                    "email": "don@example.com",
+                    "displayName": "Don Michael",
+                    "self": False,
+                },
+                "attendees": [
+                    {"email": "don@example.com", "self": False},
+                    {"email": "samit@example.com", "self": True},
+                    {"email": "cam@example.com", "self": False},
+                    {"email": "room-12@resource.calendar.google.com",
+                     "resource": True},
+                ],
+                "start": {"dateTime": "2026-08-13T14:30:00-07:00"},
+                "end": {"dateTime": "2026-08-13T15:00:00-07:00"},
+            },
+            account="ulc",
+            source="ulc_calendar",
+            tz=TZ,
+        )
+        assert event is not None
+        self.assertEqual(event.attendee_count, 1)
+
+    def test_attendee_count_zero_when_no_attendees(self):
+        event = cal.parse_event(
+            {
+                "id": "solo",
+                "summary": "Consult",
+                "start": {"dateTime": "2026-08-13T15:30:00-07:00"},
+                "end": {"dateTime": "2026-08-13T16:30:00-07:00"},
+            },
+            account="ulc",
+            source="ulc_calendar",
+            tz=TZ,
+        )
+        assert event is not None
+        self.assertEqual(event.attendee_count, 0)
 
 
 class TestFreeBlocks(unittest.TestCase):
