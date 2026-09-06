@@ -14,6 +14,7 @@ import html as html_module
 import os
 import re
 import sys
+import time
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from email.utils import getaddresses, parseaddr
@@ -206,11 +207,30 @@ def after_date(ledger_date: date | None, today: date) -> date:
     return max(ledger_date, seven_days_ago)
 
 
-def gmail_after_query(after: date) -> str:
-    return (
-        f"after:{after.year}/{after.month:02d}/{after.day:02d} "
-        "-category:promotions"
-    )
+def gmail_after_query(after: date, before: date | None = None) -> str:
+    query = f"after:{after.year}/{after.month:02d}/{after.day:02d}"
+    if before is not None:
+        query += f" before:{before.year}/{before.month:02d}/{before.day:02d}"
+    return f"{query} -category:promotions"
+
+
+def date_chunks(
+    after: date, today: date, window_days: int = 1
+) -> list[tuple[date, date]]:
+    """Split [after, today] into day-sized (start, end) chunks, oldest first.
+
+    end is exclusive, matching Gmail's `before:` semantics.
+    """
+    if window_days < 1:
+        raise ValueError("window_days must be >= 1")
+    end_bound = today + timedelta(days=1)
+    chunks: list[tuple[date, date]] = []
+    start = after
+    while start < end_bound:
+        end = min(start + timedelta(days=window_days), end_bound)
+        chunks.append((start, end))
+        start = end
+    return chunks
 
 
 def parse_simple_frontmatter(text: str) -> dict[str, Any] | None:
@@ -679,12 +699,50 @@ def load_token_credentials(source: str, config_dir: Path | None = None) -> Any:
     return loop.refresh_if_needed(creds)
 
 
-def _raise_for_auth(status: int, what: str, source: str = SOURCE_ULC_GMAIL) -> None:
-    if status in (401, 403):
+_RATE_LIMIT_REASONS = {
+    "rateLimitExceeded",
+    "userRateLimitExceeded",
+    "dailyLimitExceeded",
+    "quotaExceeded",
+    "RATE_LIMIT_EXCEEDED",
+}
+
+
+def _error_reason(response: Any) -> str | None:
+    try:
+        payload = response.json()
+    except ValueError:
+        return None
+    error = payload.get("error") if isinstance(payload, dict) else None
+    if not isinstance(error, dict):
+        return None
+    for detail in error.get("errors") or []:
+        reason = detail.get("reason")
+        if reason:
+            return str(reason)
+    for detail in error.get("details") or []:
+        reason = detail.get("reason")
+        if reason:
+            return str(reason)
+    return None
+
+
+def _raise_for_auth(response: Any, what: str, source: str = SOURCE_ULC_GMAIL) -> None:
+    status = response.status_code
+    if status not in (401, 403):
+        return
+    reason = _error_reason(response)
+    if status == 403 and reason in _RATE_LIMIT_REASONS:
         raise AuthError(
-            f"Gmail {what} returned {status}. "
-            f"Run ./oauth_loop.py --source {source} --force"
+            f"Gmail {what} returned 403 ({reason}): Gmail API quota exceeded "
+            "for this minute. Wait a bit and retry — this is not an auth "
+            "problem, do not re-run oauth_loop.py --force."
         )
+    raise AuthError(
+        f"Gmail {what} returned {status}"
+        + (f" ({reason})" if reason else "")
+        + f". Run ./oauth_loop.py --source {source} --force"
+    )
 
 
 def list_message_ids(
@@ -697,7 +755,7 @@ def list_message_ids(
         if page_token:
             params["pageToken"] = page_token
         response = session.get(GMAIL_MESSAGES_URL, params=params)
-        _raise_for_auth(response.status_code, "list", source)
+        _raise_for_auth(response, "list", source)
         if response.status_code != 200:
             raise RuntimeError(f"Gmail list returned {response.status_code}")
         payload = response.json()
@@ -717,7 +775,7 @@ def get_message(
     response = session.get(
         f"{GMAIL_MESSAGES_URL}/{msg_id}", params={"format": "full"}
     )
-    _raise_for_auth(response.status_code, "get", source)
+    _raise_for_auth(response, "get", source)
     if response.status_code != 200:
         raise RuntimeError(f"Gmail get returned {response.status_code}")
     return response.json()
@@ -746,16 +804,34 @@ def thread_excerpt(session: Any, thread_id: str, current_id: str) -> str:
 
 
 def pull_messages(
-    session: Any, query: str, source: str = SOURCE_ULC_GMAIL
-) -> list[ParsedMessage]:
+    session: Any,
+    query: str,
+    source: str = SOURCE_ULC_GMAIL,
+    seen: set[str] | None = None,
+    message_pause: float = 0.0,
+) -> tuple[list[ParsedMessage], int]:
+    """Fetch every unseen message id matching query.
+
+    Gmail's rateLimitExceeded quota is enforced per user per second, so a
+    burst of unseen messages fetched back-to-back within one chunk can trip
+    it even when callers pace themselves between chunks. message_pause
+    throttles that burst at the level of individual get/threads.get calls.
+    """
+    seen = seen if seen is not None else set()
     messages: list[ParsedMessage] = []
+    skipped_dupe = 0
     for msg_id in list_message_ids(session, query, source):
+        if msg_id in seen:
+            skipped_dupe += 1
+            continue
+        if messages and message_pause > 0:
+            time.sleep(message_pause)
         resource = get_message(session, msg_id, source)
         excerpt = thread_excerpt(
             session, str(resource.get("threadId") or ""), msg_id
         )
         messages.append(parse_gmail_resource(resource, excerpt))
-    return messages
+    return messages, skipped_dupe
 
 
 def filter_and_store(
@@ -766,12 +842,16 @@ def filter_and_store(
     run_date: date,
     pulled_at: datetime,
     dry_run: bool = False,
+    pre_skipped_dupe: int = 0,
 ) -> tuple[RunCounts, Path]:
     contacts = load_contacts(vault_root)
     domains = vendor_domains(contacts, source)
     seen = existing_gmail_ids(intake_dir(vault_root), source)
     dest = pulled_path(vault_root, run_date, source)
-    counts = RunCounts(pulled=len(messages))
+    counts = RunCounts(
+        pulled=len(messages) + pre_skipped_dupe,
+        skipped_dupe=pre_skipped_dupe,
+    )
     sections: list[str] = []
     drops: list[tuple[str, str]] = []
     for message in messages:
@@ -853,6 +933,34 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help=argparse.SUPPRESS,
     )
+    parser.add_argument(
+        "--window-days",
+        type=int,
+        default=1,
+        help=(
+            "Split the lookback window into chunks of this many days, "
+            "fetched oldest-first and stored as each chunk completes "
+            "(default: 1)."
+        ),
+    )
+    parser.add_argument(
+        "--pause-seconds",
+        type=float,
+        default=20.0,
+        help="Pause between day chunks to let Gmail's quota refresh (default: 20.0).",
+    )
+    parser.add_argument(
+        "--message-pause-seconds",
+        type=float,
+        default=0.2,
+        help=(
+            "Pause between individual message fetches within a chunk "
+            "(default: 0.2). Gmail's rateLimitExceeded quota is enforced "
+            "per user per second, so a chunk with many unseen messages can "
+            "trip it on its own by firing get/threads.get back-to-back, "
+            "even with --pause-seconds between chunks."
+        ),
+    )
     return parser.parse_args(argv)
 
 
@@ -862,7 +970,6 @@ def main(argv: list[str] | None = None) -> int:
     source = args.source
     today = date.today()
     after = after_date(load_ledger_date(ledger_path(vault_root)), today)
-    query = gmail_after_query(after)
     try:
         creds = load_token_credentials(source, args.config_dir)
     except FileNotFoundError as exc:
@@ -876,22 +983,43 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
     session = loop.authorized_session(creds)
-    try:
-        messages = pull_messages(session, query, source)
-    except AuthError as exc:
-        print(str(exc), file=sys.stderr)
-        return 1
-    counts, dest = filter_and_store(
-        messages,
-        vault_root=vault_root,
-        source=source,
-        run_date=today,
-        pulled_at=datetime.now().astimezone(),
-        dry_run=args.dry_run,
-    )
+    chunks = date_chunks(after, today, args.window_days)
+    pulled_at = datetime.now().astimezone()
+    totals = RunCounts()
+    dest = pulled_path(vault_root, today, source)
+    error: AuthError | None = None
+    for i, (chunk_after, chunk_before) in enumerate(chunks):
+        query = gmail_after_query(chunk_after, chunk_before)
+        seen = existing_gmail_ids(intake_dir(vault_root), source)
+        try:
+            messages, pre_skipped_dupe = pull_messages(
+                session, query, source, seen, message_pause=args.message_pause_seconds
+            )
+        except AuthError as exc:
+            error = exc
+            break
+        counts, dest = filter_and_store(
+            messages,
+            vault_root=vault_root,
+            source=source,
+            run_date=today,
+            pulled_at=pulled_at,
+            dry_run=args.dry_run,
+            pre_skipped_dupe=pre_skipped_dupe,
+        )
+        totals.pulled += counts.pulled
+        totals.keep += counts.keep
+        totals.borderline += counts.borderline
+        totals.drop += counts.drop
+        totals.skipped_dupe += counts.skipped_dupe
+        if i < len(chunks) - 1 and args.pause_seconds > 0:
+            time.sleep(args.pause_seconds)
     print_counts(
-        counts, after=after, dest=dest, dry_run=args.dry_run, source=source
+        totals, after=after, dest=dest, dry_run=args.dry_run, source=source
     )
+    if error is not None:
+        print(str(error), file=sys.stderr)
+        return 1
     return 0
 
 

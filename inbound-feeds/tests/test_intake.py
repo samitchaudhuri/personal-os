@@ -13,7 +13,7 @@ import shutil
 import sys
 import tempfile
 import unittest
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from io import StringIO
 from pathlib import Path
 from unittest.mock import Mock, patch
@@ -70,6 +70,41 @@ class TestWindow(unittest.TestCase):
             intake.gmail_after_query(date(2026, 8, 7)),
             "after:2026/08/07 -category:promotions",
         )
+
+    def test_gmail_query_with_before(self):
+        self.assertEqual(
+            intake.gmail_after_query(date(2026, 8, 7), date(2026, 8, 8)),
+            "after:2026/08/07 before:2026/08/08 -category:promotions",
+        )
+
+    def test_date_chunks_default_one_day_each(self):
+        self.assertEqual(
+            intake.date_chunks(date(2026, 8, 7), date(2026, 8, 9)),
+            [
+                (date(2026, 8, 7), date(2026, 8, 8)),
+                (date(2026, 8, 8), date(2026, 8, 9)),
+                (date(2026, 8, 9), date(2026, 8, 10)),
+            ],
+        )
+
+    def test_date_chunks_same_day(self):
+        self.assertEqual(
+            intake.date_chunks(date(2026, 8, 7), date(2026, 8, 7)),
+            [(date(2026, 8, 7), date(2026, 8, 8))],
+        )
+
+    def test_date_chunks_wider_window(self):
+        self.assertEqual(
+            intake.date_chunks(date(2026, 8, 1), date(2026, 8, 6), window_days=3),
+            [
+                (date(2026, 8, 1), date(2026, 8, 4)),
+                (date(2026, 8, 4), date(2026, 8, 7)),
+            ],
+        )
+
+    def test_date_chunks_rejects_non_positive_window(self):
+        with self.assertRaises(ValueError):
+            intake.date_chunks(date(2026, 8, 7), date(2026, 8, 9), window_days=0)
 
 
 class TestLedger(unittest.TestCase):
@@ -313,6 +348,52 @@ class TestGmailParse(unittest.TestCase):
         parsed = intake.parse_gmail_resource(resource)
         self.assertIn("Please confirm the lease by Friday.", parsed.body)
         self.assertNotIn("<p>", parsed.body)
+
+
+class TestPullMessages(unittest.TestCase):
+    def _patched_fetch(self, ids):
+        return (
+            patch.object(intake, "list_message_ids", return_value=ids),
+            patch.object(intake, "get_message", return_value={"threadId": "t"}),
+            patch.object(intake, "thread_excerpt", return_value=""),
+            patch.object(
+                intake,
+                "parse_gmail_resource",
+                side_effect=lambda r, e: _msg(gmail_id="x"),
+            ),
+        )
+
+    def test_message_pause_throttles_between_fetches_not_before_first(self):
+        patches = self._patched_fetch(["a", "b", "c"])
+        with patches[0], patches[1], patches[2], patches[3]:
+            with patch.object(intake.time, "sleep") as sleep_mock:
+                messages, skipped = intake.pull_messages(
+                    Mock(), "q", message_pause=0.3
+                )
+        self.assertEqual(len(messages), 3)
+        self.assertEqual(skipped, 0)
+        self.assertEqual(sleep_mock.call_count, 2)
+        sleep_mock.assert_called_with(0.3)
+
+    def test_dupes_are_skipped_without_sleeping_or_fetching(self):
+        patches = self._patched_fetch(["a", "b"])
+        with patches[0], patches[1] as get_mock, patches[2], patches[3]:
+            with patch.object(intake.time, "sleep") as sleep_mock:
+                messages, skipped = intake.pull_messages(
+                    Mock(), "q", seen={"a"}, message_pause=0.3
+                )
+        self.assertEqual(skipped, 1)
+        self.assertEqual(len(messages), 1)
+        get_mock.assert_called_once()
+        self.assertEqual(get_mock.call_args.args[1], "b")
+        sleep_mock.assert_not_called()
+
+    def test_zero_message_pause_never_sleeps(self):
+        patches = self._patched_fetch(["a", "b", "c"])
+        with patches[0], patches[1], patches[2], patches[3]:
+            with patch.object(intake.time, "sleep") as sleep_mock:
+                intake.pull_messages(Mock(), "q", message_pause=0.0)
+        sleep_mock.assert_not_called()
 
 
 class TestStore(unittest.TestCase):
@@ -566,6 +647,83 @@ class TestCli(unittest.TestCase):
             self.assertIn("oauth_loop.py", err.getvalue())
             pull.assert_not_called()
             oauth.assert_not_called()
+
+    def test_chunks_by_day_and_persists_before_rate_limit_stops_run(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            vault = Path(tmp) / "vault"
+            shutil.copytree(FIXTURE_VAULT, vault)
+            today = date.today()
+            ledger = vault / "Management/Intake/Intake Ledger.md"
+            ledger.write_text(
+                "---\n"
+                f"last_processed_batch_date: {(today - timedelta(days=2)).isoformat()}\n"
+                "---\n\n# Intake ledger\n"
+            )
+            msg_a = _msg(
+                gmail_id="chunk-a",
+                subject="A",
+                from_header="Don Michael <don@ultimatelongevitycenters.com>",
+            )
+            msg_b = _msg(
+                gmail_id="chunk-b",
+                subject="B",
+                from_header="Don Michael <don@ultimatelongevitycenters.com>",
+            )
+            rate_limit_error = intake.AuthError("Gmail list returned 403 (rateLimitExceeded)")
+            with patch.object(
+                intake,
+                "pull_messages",
+                side_effect=[([msg_a], 0), ([msg_b], 0), rate_limit_error],
+            ) as pull:
+                with patch.object(intake.time, "sleep") as sleep_mock:
+                    with patch.object(
+                        intake, "load_token_credentials", return_value=object()
+                    ):
+                        with patch.object(
+                            loop, "authorized_session", return_value=Mock()
+                        ):
+                            with patch("sys.stderr", StringIO()) as err:
+                                code = intake.main(
+                                    ["--vault", str(vault), "--pause-seconds", "5"]
+                                )
+            self.assertEqual(code, 1)
+            self.assertEqual(pull.call_count, 3)
+            self.assertIn("rateLimitExceeded", err.getvalue())
+            # paused between each pair of consecutive chunks (3 chunks -> 2 pauses)
+            self.assertEqual(sleep_mock.call_count, 2)
+            sleep_mock.assert_called_with(5.0)
+            text = (
+                vault / f"Management/Intake/{today.isoformat()} Pulled ULC Gmail.md"
+            ).read_text()
+            self.assertIn("gmail_id: chunk-a", text)
+            self.assertIn("gmail_id: chunk-b", text)
+
+    def test_pause_seconds_zero_skips_sleep(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            vault = Path(tmp) / "vault"
+            shutil.copytree(FIXTURE_VAULT, vault)
+            today = date.today()
+            ledger = vault / "Management/Intake/Intake Ledger.md"
+            ledger.write_text(
+                "---\n"
+                f"last_processed_batch_date: {(today - timedelta(days=1)).isoformat()}\n"
+                "---\n\n# Intake ledger\n"
+            )
+            with patch.object(
+                intake, "pull_messages", return_value=([], 0)
+            ):
+                with patch.object(intake.time, "sleep") as sleep_mock:
+                    with patch.object(
+                        intake, "load_token_credentials", return_value=object()
+                    ):
+                        with patch.object(
+                            loop, "authorized_session", return_value=Mock()
+                        ):
+                            code = intake.main(
+                                ["--vault", str(vault), "--pause-seconds", "0"]
+                            )
+            self.assertEqual(code, 0)
+            sleep_mock.assert_not_called()
 
     def test_gmail_401_exits_1_with_force_hint(self):
         with tempfile.TemporaryDirectory() as tmp:
