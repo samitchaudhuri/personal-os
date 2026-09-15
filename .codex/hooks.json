@@ -5,7 +5,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "'/Users/samit/work/personal-os/.codex/hooks/thread-reminder.sh'"
+            "command": "/bin/bash '/Users/samit/work/personal-os/.codex/hooks/thread-reminder.sh'",
+            "timeout": 5
           }
         ]
       }
