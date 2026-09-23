@@ -50,7 +50,7 @@ except ImportError:
 # CloudStorage path, so this works across machines/clones without editing.
 GOV_DIR = (
     Path(__file__).resolve().parent.parent
-    / "gdrive" / "private" / "ULC-personal" / "Governance" / "Entity Structure" / "Organizational Meeting"
+    / "gdrive" / "private" / "ULC-personal" / "Governance" / "Entity Structure"
 )
 # The blank NW template is entity-agnostic (byte-identical across entities),
 # so it lives once at Entity Structure/Templates rather than per-entity.
@@ -270,9 +270,9 @@ def main() -> None:
 
     entity = dict(ENTITIES[args.entity]) if args.entity else {}
     if args.entity:
-        entity_dir = GOV_DIR / entity["folder"]
+        entity_dir = GOV_DIR / entity["folder"] / "Organizational Meeting"
         xlsx = args.xlsx or entity_dir / f"{entity['ledger_stem']}.xlsx"
-        template = args.template or GOV_DIR.parent / "Templates" / f"{TEMPLATE_STEM}.pdf"
+        template = args.template or GOV_DIR / "Templates" / f"{TEMPLATE_STEM}.pdf"
         output_dir = entity_dir
     else:
         xlsx, template = args.xlsx, args.template

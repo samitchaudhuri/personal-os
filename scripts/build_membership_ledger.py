@@ -60,7 +60,7 @@ except ImportError:
 # CloudStorage path, so this works across machines/clones without editing.
 GOV_DIR = (
     Path(__file__).resolve().parent.parent
-    / "gdrive" / "private" / "ULC-personal" / "Governance" / "Entity Structure" / "Organizational Meeting"
+    / "gdrive" / "private" / "ULC-personal" / "Governance" / "Entity Structure"
 )
 
 # Per-entity facts that don't live in the ledger .xlsx (from the CA Articles
@@ -236,13 +236,13 @@ def main() -> None:
     args = parse_args()
     if args.all:
         for entity in ENTITIES.values():
-            entity_dir = GOV_DIR / entity["folder"]
+            entity_dir = GOV_DIR / entity["folder"] / "Organizational Meeting"
             build_one(entity, entity_dir / f"{entity['stem']}.xlsx", entity_dir / f"{entity['stem']}.pdf")
         return
 
     if args.entity:
         entity = ENTITIES[args.entity]
-        entity_dir = GOV_DIR / entity["folder"]
+        entity_dir = GOV_DIR / entity["folder"] / "Organizational Meeting"
         xlsx = args.xlsx or entity_dir / f"{entity['stem']}.xlsx"
         pdf = args.pdf or entity_dir / f"{entity['stem']}.pdf"
         build_one(entity, xlsx, pdf)

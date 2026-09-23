@@ -35,7 +35,7 @@ except ImportError:
 # CloudStorage path, so this works across machines/clones without editing.
 GOV_DIR = (
     Path(__file__).resolve().parent.parent
-    / "gdrive" / "private" / "ULC-personal" / "Governance" / "Entity Structure" / "Organizational Meeting"
+    / "gdrive" / "private" / "ULC-personal" / "Governance" / "Entity Structure"
 )
 # The blank NW template is entity-agnostic (byte-identical across entities),
 # so it lives once at Entity Structure/Templates rather than per-entity.
@@ -128,8 +128,8 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     entity = ENTITIES[args.entity]
-    entity_dir = GOV_DIR / entity["folder"]
-    template = args.template or GOV_DIR.parent / "Templates" / f"{TEMPLATE_STEM}.pdf"
+    entity_dir = GOV_DIR / entity["folder"] / "Organizational Meeting"
+    template = args.template or GOV_DIR / "Templates" / f"{TEMPLATE_STEM}.pdf"
     if not template.exists():
         print(f"Missing template: {template}", file=sys.stderr)
         sys.exit(1)
