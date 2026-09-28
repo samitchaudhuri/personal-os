@@ -4,7 +4,7 @@ Merges yellow-highlight inputs from the staging markdown into the ULC sample bus
 
 ## How the plan is built
 
-See vault note [[ULC Business Plan Runbook]] for the full picture (three source files → staging → template).
+See vault note [[ULC Business Plan]] for the full picture (three source files → staging → template).
 
 ## Files (Google Drive `Finance/Funding Plan/`)
 
@@ -32,8 +32,9 @@ python3 franchise/ulc-business-plan/merge_business_plan.py
 
 ## Rules
 
-- **Only yellow-highlighted runs** are replaced.
-- Non-yellow placeholders (`[XX]%`, demographics bracket, Excel template name) stay as-is.
+- **Yellow-highlighted runs** are replaced from the placeholder map.
+- White text changes only for the exact phrases in `WHITE_TEXT_MAP`: `[XX]%` from `equity_percent` and "who brings experience" from `owner_experience_clause`, and the demographics bracket from `market_demographics`. Each phrase must sit inside one run.
+- Other non-yellow placeholders, such as the Excel template name, stay as-is.
 - Template file is never modified; output is a fresh copy each run.
 - Merge copies the template docx and patches yellow `w:t` nodes; emptied split runs are removed.
 
@@ -45,4 +46,4 @@ python3 -m unittest discover -s franchise/ulc-business-plan/tests
 
 ## Vault cross-link
 
-Workflow doc: `vault/Notes/ULC Business Plan Runbook.md`
+Workflow doc: `vault/Agent/Workflows/ULC Business Plan.md`

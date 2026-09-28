@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Merge ULC_Business_Plan_Staging.md into ULC_Sample Business Plan.docx.
 
-Replaces text in yellow-highlighted runs only (consecutive yellow groups).
-Non-highlighted runs are left unchanged.
+Replaces text in yellow-highlighted runs (consecutive yellow groups). In
+non-highlighted runs, only the exact phrases in ``WHITE_TEXT_MAP`` change; all
+other white template text is left unchanged.
 
 Patches ``word/document.xml`` in place on a template copy (``zip -u``) so the
 OOXML package stays byte-stable. Split yellow placeholders clear trailing runs
@@ -48,6 +49,17 @@ PLACEHOLDER_MAP: list[tuple[str, str]] = [
     ("[X]", "breakeven_months"),
 ]
 
+# Exact phrases in white (non-highlighted) template text that this plan
+# overrides. Each phrase must sit inside a single run.
+WHITE_TEXT_MAP: list[tuple[str, str]] = [
+    ("[XX]%", "equity_percent"),
+    ("who brings experience", "owner_experience_clause"),
+    (
+        "[insert demographics—e.g., “affluent residential neighborhoods, high concentration of health-conscious professionals, and a growing demand for personalized wellness services”]",
+        "market_demographics",
+    ),
+]
+
 DEFAULT_BASE = (
     Path(__file__).parent.parent.parent
     / "gdrive" / "private" / "ULC-personal" / "Finance" / "Funding Plan"
@@ -73,7 +85,7 @@ def parse_input_md(path: Path) -> dict[str, str]:
                 "(set a concrete value before merge)"
             )
         values[key] = value
-    required = {k for _, k in PLACEHOLDER_MAP}
+    required = {k for _, k in PLACEHOLDER_MAP + WHITE_TEXT_MAP}
     missing = required - set(values.keys())
     if missing:
         raise ValueError(f"Missing fields in {path.name}: {sorted(missing)}")
@@ -100,6 +112,14 @@ def apply_replacements(text: str, values: dict[str, str]) -> str:
     for placeholder, key in PLACEHOLDER_MAP:
         if placeholder in out:
             out = out.replace(placeholder, values[key])
+    return out
+
+
+def apply_white_replacements(text: str, values: dict[str, str]) -> str:
+    out = text
+    for phrase, key in WHITE_TEXT_MAP:
+        if phrase in out:
+            out = out.replace(phrase, values[key])
     return out
 
 
@@ -137,6 +157,13 @@ def collect_changes(
         i = 0
         while i < len(runs):
             if not is_yellow_run(runs[i]):
+                wts = runs[i].findall(f"{W}t")
+                if len(wts) == 1:
+                    old = wts[0].text or ""
+                    new = apply_white_replacements(old, values)
+                    if new != old:
+                        paragraph_changed = True
+                        patch_indices[wt_to_index[id(wts[0])]] = new
                 i += 1
                 continue
 
@@ -262,7 +289,7 @@ def main(argv: list[str]) -> int:
 
     values = parse_input_md(input_path)
     n = merge_docx(template, output, values)
-    print(f"OK: merged {n} paragraph(s) with yellow edits")
+    print(f"OK: merged {n} paragraph(s) with yellow or listed white-text edits")
     print(f"    input:    {input_path}")
     print(f"    template: {template}")
     print(f"    output:   {output}")
