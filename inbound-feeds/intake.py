@@ -136,6 +136,7 @@ class ParsedMessage:
     headers: dict[str, str] = field(default_factory=dict)
     attachment_names: list[str] = field(default_factory=list)
     thread_excerpt: str = ""
+    owner_in_thread: bool = False
 
 
 @dataclass
@@ -536,6 +537,8 @@ def classify(
 
     if contact_match(message, contacts, source):
         return Classification(INGRESS_KEEP, "people_contact")
+    if message.owner_in_thread:
+        return Classification(INGRESS_KEEP, "replied_thread")
 
     franchise_hit = bool(msg_domains & FRANCHISE_DOMAINS)
     vendor_hit = bool(msg_domains & (domains - FRANCHISE_DOMAINS))
@@ -781,26 +784,29 @@ def get_message(
     return response.json()
 
 
-def thread_excerpt(session: Any, thread_id: str, current_id: str) -> str:
+def thread_context(session: Any, thread_id: str, current_id: str) -> tuple[str, bool]:
+    """Return up to three snippets from the rest of the thread, and whether
+    the mailbox owner sent any message in it (Gmail's SENT label)."""
     if not thread_id:
-        return ""
+        return "", False
     response = session.get(
         f"{GMAIL_THREADS_URL}/{thread_id}",
         params={"format": "metadata", "metadataHeaders": ["From", "Subject"]},
     )
     if response.status_code != 200:
-        return ""
+        return "", False
     snippets: list[str] = []
+    owner_sent = False
     for item in (response.json().get("messages") or []):
+        if "SENT" in (item.get("labelIds") or []):
+            owner_sent = True
         other_id = str(item.get("id") or "")
-        if other_id == current_id:
+        if other_id == current_id or len(snippets) >= 3:
             continue
         snippet = str(item.get("snippet") or "").strip()
         if snippet:
             snippets.append(snippet)
-        if len(snippets) >= 3:
-            break
-    return "\n\n".join(snippets)
+    return "\n\n".join(snippets), owner_sent
 
 
 def pull_messages(
@@ -827,10 +833,14 @@ def pull_messages(
         if messages and message_pause > 0:
             time.sleep(message_pause)
         resource = get_message(session, msg_id, source)
-        excerpt = thread_excerpt(
+        excerpt, owner_sent = thread_context(
             session, str(resource.get("threadId") or ""), msg_id
         )
-        messages.append(parse_gmail_resource(resource, excerpt))
+        parsed = parse_gmail_resource(resource, excerpt)
+        parsed.owner_in_thread = owner_sent or "SENT" in (
+            resource.get("labelIds") or []
+        )
+        messages.append(parsed)
     return messages, skipped_dupe
 
 
@@ -946,16 +956,16 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--pause-seconds",
         type=float,
-        default=20.0,
-        help="Pause between day chunks to let Gmail's quota refresh (default: 20.0).",
+        default=60.0,
+        help="Pause between day chunks to let Gmail's quota refresh (default: 60.0).",
     )
     parser.add_argument(
         "--message-pause-seconds",
         type=float,
-        default=0.2,
+        default=1.0,
         help=(
             "Pause between individual message fetches within a chunk "
-            "(default: 0.2). Gmail's rateLimitExceeded quota is enforced "
+            "(default: 1.0). Gmail's rateLimitExceeded quota is enforced "
             "per user per second, so a chunk with many unseen messages can "
             "trip it on its own by firing get/threads.get back-to-back, "
             "even with --pause-seconds between chunks."

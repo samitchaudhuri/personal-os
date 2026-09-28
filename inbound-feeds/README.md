@@ -87,16 +87,16 @@ Once Pull fetches the messages for a day chunk, Filter and Store finish writing 
 
 - Reducing the number of API calls. Within a chunk, Pull checks every message id against what Store has already written for that source, and only a genuinely new id is fetched with an API request. An id already on file costs nothing beyond the `messages.list` call that returned it.
 - Spacing the API calls out. Gmail's rate limit is enforced per second rather than per minute, so a single chunk with a large burst of new messages can still exceed the quota even after the id check removes the ones already on file. Pull spaces its calls out at two levels.
-  - Between individual fetches, controlled by `--message-pause-seconds` and 0.2 seconds by default. This is what keeps a chunk's own burst of `messages.get` and `threads.get` calls under the per-second limit.
-  - Between chunks, controlled by `--pause-seconds` and 20 seconds by default. This gives the next chunk a gap from the one before it, rather than starting immediately after.
+  - Between individual fetches, controlled by `--message-pause-seconds` and 1 second by default. This is what keeps a chunk's own burst of `messages.get` and `threads.get` calls under the per-second limit.
+  - Between chunks, controlled by `--pause-seconds` and 60 seconds by default. This gives the next chunk a gap from the one before it, rather than starting immediately after.
 
 The Examples below show both a run that hits the limit and stops, and the same mailbox passing once pacing is in place.
 
 ## Examples
 
-The first example uses `gmail-account1` to illustrate the effect of the mechanism that reduces API volume. For one chunk, `messages.list` returns 66 ids for that day; 29 are already stored, so Pull fetches only the remaining 37, 0.2 seconds apart. That cuts the chunk's Gmail calls from a possible 133 (1 + 66 × 2) to 75 (1 + 37 × 2), and the fraction skipped grows on every later run as more of the window is already on file.
+The first example uses `gmail-account1` to illustrate the effect of the mechanism that reduces API volume. For one chunk, `messages.list` returns 66 ids for that day; 29 are already stored, so Pull fetches only the remaining 37. That cuts the chunk's Gmail calls from a possible 133 (1 + 66 × 2) to 75 (1 + 37 × 2), and the fraction skipped grows on every later run as more of the window is already on file.
 
-The second example uses `gmail-account2` to illustrate the effect of the spacing mechanism within a chunk. Before `--message-pause-seconds` existed, this mailbox's backlog tripped `rateLimitExceeded` on a `messages.get` call partway through the seven-day window, after 112 messages had already been fetched, classified, and stored across the earlier chunks. Pull did not retry that call and did not move on to the remaining chunks: it printed the quota error to stderr and `main` returned exit code 1 right there. The 112 already stored were not lost, but nothing past that point got fetched until the command was run again. After adding the 0.2-second pause between individual fetches, the same mailbox's burst was gone, and the same seven-day window completed in a single run, all 212 messages fetched, classified, and stored, with no 403 at all. This is why `--message-pause-seconds` defaults to 0.2 rather than 0.
+The second example uses `gmail-account2` to illustrate the effect of the spacing mechanism within a chunk. Before `--message-pause-seconds` existed, this mailbox's backlog tripped `rateLimitExceeded` on a `messages.get` call partway through the seven-day window, after 112 messages had already been fetched, classified, and stored across the earlier chunks. Pull did not retry that call and did not move on to the remaining chunks: it printed the quota error to stderr and `main` returned exit code 1 right there. The 112 already stored were not lost, but nothing past that point got fetched until the command was run again. After adding the 0.2-second pause between individual fetches, the same mailbox's burst was gone, and the same seven-day window completed in a single run, all 212 messages fetched, classified, and stored, with no 403 at all. A 0.2-second pause still left a larger backlog exposed. On 2026-09-25 a Personal Gmail pull with 0.2 seconds between fetches and 20 seconds between chunks hit the quota twice, and the same pull finished with 1 second and 60 seconds. Those two values are now the defaults.
 
 A run that still fails partway, for any mailbox, is safe to just re-run: the id check means every chunk already on file costs nothing but a `messages.list` call the second time.
 
@@ -109,12 +109,12 @@ flowchart TD
     List --> ForEach["Next id in chunk"]
     ForEach -->|already stored| SkipDupe["skip, zero cost"]
     SkipDupe --> ForEach
-    ForEach -->|unseen| Throttle["sleep --message-pause-seconds\n(0.2s default)"]
+    ForEach -->|unseen| Throttle["sleep --message-pause-seconds\n(1s default)"]
     Throttle --> Fetch["messages.get + threads.get"]
     Fetch --> ForEach
     ForEach -->|no ids left| Store["Filter + Store this chunk\n(written to disk now)"]
     Store --> More{"chunks remain?"}
-    More -->|yes| Pause["sleep --pause-seconds\n(20s default)"]
+    More -->|yes| Pause["sleep --pause-seconds\n(60s default)"]
     Pause --> Chunk
     More -->|no| Done["exit 0"]
     List -.->|403| Reason{"error reason?"}
@@ -184,7 +184,10 @@ People contact is on the thread
 - Sequel / ULC mail with substance keeps; empty calendar-accept from that
 domain still drops
 - New sender on a known vendor domain is borderline with `needs_review: true`
+- A message in a thread where the mailbox owner sent a message keeps as
+`replied_thread`; calendar noise, marketing, and receipts still drop first
 - Cold outreach drops; `gmail_id` already in a Pulled file is skipped
+- Pause defaults are 1 second between fetches and 60 seconds between chunks
 - Store refuses Raw Inputs paths and does not write the five Management
 folders
 - Calendar sources map to `ulc_calendar.json` and `personal_calendar.json`

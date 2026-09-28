@@ -289,6 +289,34 @@ class TestClassify(unittest.TestCase):
         self.assertTrue(result.needs_review)
         self.assertEqual(result.reason, "new_sender_known_domain")
 
+    def test_replied_thread_keeps_unknown_domain(self):
+        # 2026-09-22: Samit's own reply to a recruiter on an unknown domain
+        # dropped as cold outreach, so the whole thread missed intake.
+        result = self._classify(
+            _msg(
+                from_header=f"Samit Chaudhuri <{OWNER}>",
+                to_header="Erica Recruiter <erica@talentfirm.example>",
+                subject="Re: CTO search",
+                body="Happy to talk. Which company is it?",
+                owner_in_thread=True,
+            )
+        )
+        self.assertEqual(result.ingress, "keep")
+        self.assertEqual(result.reason, "replied_thread")
+
+    def test_replied_thread_does_not_rescue_marketing(self):
+        result = self._classify(
+            _msg(
+                from_header="Deals <deals@retail-blast.example>",
+                subject="Re: 50% off blenders",
+                body="More deals inside.",
+                headers={"list-unsubscribe": "<mailto:u@retail-blast.example>"},
+                owner_in_thread=True,
+            )
+        )
+        self.assertEqual(result.ingress, "drop")
+        self.assertEqual(result.reason, "marketing")
+
     def test_cold_outreach_drops(self):
         result = self._classify(
             _msg(
@@ -355,7 +383,7 @@ class TestPullMessages(unittest.TestCase):
         return (
             patch.object(intake, "list_message_ids", return_value=ids),
             patch.object(intake, "get_message", return_value={"threadId": "t"}),
-            patch.object(intake, "thread_excerpt", return_value=""),
+            patch.object(intake, "thread_context", return_value=("", False)),
             patch.object(
                 intake,
                 "parse_gmail_resource",
@@ -387,6 +415,39 @@ class TestPullMessages(unittest.TestCase):
         get_mock.assert_called_once()
         self.assertEqual(get_mock.call_args.args[1], "b")
         sleep_mock.assert_not_called()
+
+    def test_owner_sent_in_thread_or_message_sets_flag(self):
+        cases = [
+            (("", True), {"threadId": "t"}, True),
+            (("", False), {"threadId": "t", "labelIds": ["SENT"]}, True),
+            (("", False), {"threadId": "t", "labelIds": ["INBOX"]}, False),
+        ]
+        for context, resource, expected in cases:
+            with self.subTest(context=context, resource=resource):
+                with patch.object(intake, "list_message_ids", return_value=["a"]), \
+                        patch.object(intake, "get_message", return_value=resource), \
+                        patch.object(intake, "thread_context", return_value=context):
+                    messages, _ = intake.pull_messages(Mock(), "q")
+                self.assertEqual(messages[0].owner_in_thread, expected)
+
+    def test_thread_context_detects_sent_label_on_any_message(self):
+        response = Mock(status_code=200)
+        response.json.return_value = {
+            "messages": [
+                {"id": "cur", "labelIds": ["INBOX"], "snippet": "current"},
+                {"id": "mine", "labelIds": ["SENT"], "snippet": "my reply"},
+            ]
+        }
+        session = Mock()
+        session.get.return_value = response
+        excerpt, owner_sent = intake.thread_context(session, "t", "cur")
+        self.assertEqual(excerpt, "my reply")
+        self.assertTrue(owner_sent)
+
+    def test_default_pauses_match_quota_safe_values(self):
+        args = intake.parse_args([])
+        self.assertEqual(args.message_pause_seconds, 1.0)
+        self.assertEqual(args.pause_seconds, 60.0)
 
     def test_zero_message_pause_never_sleeps(self):
         patches = self._patched_fetch(["a", "b", "c"])
