@@ -21,6 +21,7 @@ import os
 import re
 import sys
 
+import openpyxl
 import yaml
 
 try:
@@ -32,8 +33,8 @@ except ImportError:  # pragma: no cover
 # Output column order (matches the existing combined_facts.csv schema).
 COLUMNS = [
     "site", "address", "composite", "vt_score",
-    "sf_target", "gen", "shell",
-    "total_rent", "total_bo", "total_ti", "bo_net",
+    "sf", "gen", "shell",
+    "total_rent", "total_bo", "total_ti", "bo_net", "tier", "open_mo",
     "psf_rent", "psf_bo", "psf_ti",
     "base_psf", "nnn_psf",
     "gate_afford",
@@ -49,17 +50,19 @@ COLUMNS = [
     "co_tenants", "notes",
 ]
 
-# Columns copied verbatim from manual_facts.csv (human-authored). `territory`
-# isn't tracked downstream (the G-territory gate was retired), so it's dropped
-# from combined_facts.csv here. `generation` and `ti_psf` are also authored in
-# manual_facts.csv but land under the shorter `gen` / `psf_ti` output names —
-# see the explicit rename in main() instead of listing them here.
+# Columns copied verbatim from manual_facts.csv (human-authored), in the same
+# relative order as COLUMNS so the two files can be checked side by side.
+# manual_facts.csv's header is `site` followed by exactly these columns.
+# `tier` is the site's estimated membership pricing tier (1-5) and `open_mo`
+# the opening month (YYYY-MM). The unit economics model starts 3 presales
+# months before open_mo (see site_model.py).
 MANUAL_PASSTHROUGH = [
-    "address", "sf_target", "base_psf", "nnn_psf",
-    "co_tenants", "notes",
+    "address", "sf", "gen", "tier", "open_mo",
+    "psf_ti", "base_psf", "nnn_psf",
     "placer_source", "placer_mon", "placer_tue", "placer_wed", "placer_thu",
     "placer_fri", "placer_sat", "placer_sun",
     "neigh_score", "cust_score", "resid_score", "visib_score",
+    "co_tenants", "notes",
 ]
 
 PLACER_DAYS = ["placer_mon", "placer_tue", "placer_wed", "placer_thu",
@@ -200,17 +203,90 @@ def read_page_md(path):
         return f.read()
 
 
+# Deal-matrix row label (column A) -> output column. Columns B onward are the
+# negotiation rounds, oldest first.
+MATRIX_TERMS = {
+    "size (sf)": "sf",
+    "initial base rent": "base_psf",
+    "expenses": "nnn_psf",
+    "tenant improvement allowance": "psf_ti",
+}
+PSF_RE = re.compile(r"\$\s*([\d,]+(?:\.\d+)?)\s*/\s*SF", re.I)
+
+
+def matrix_round(path):
+    """'... Deal Matrix.xlsx' is round 1, '... Deal Matrix-3.xlsx' round 3."""
+    m = re.search(r"Deal Matrix(?:-(\d+))?\.xlsx$", os.path.basename(path))
+    return int(m.group(1) or 1) if m else 0
+
+
+def latest_matrix(folder):
+    """The site's highest-numbered deal matrix, skipping Office lock files."""
+    paths = [p for p in glob.glob(os.path.join(folder, "*Deal Matrix*.xlsx"))
+             if not os.path.basename(p).startswith("~$") and matrix_round(p)]
+    return max(paths, key=matrix_round) if paths else None
+
+
+def parse_term(col, value):
+    """'$58.00/SF' -> 58.0; 'Est $21.00/SF NNN' -> 21.0; '$75/SF ($168,525.00)' -> 75.0."""
+    if value is None:
+        return None
+    if col == "sf":
+        return parse_num(value)
+    m = PSF_RE.search(str(value))
+    return float(m.group(1).replace(",", "")) if m else None
+
+
+def parse_matrix_rows(rows):
+    """Pure: {column: value} from the latest round with a parseable value per term."""
+    out = {}
+    for r in rows:
+        col = MATRIX_TERMS.get(str(r[0] or "").strip().lower()) if r else None
+        if not col:
+            continue
+        for v in reversed(r[1:]):
+            parsed = parse_term(col, v)
+            if parsed is not None:
+                out[col] = parsed
+                break
+    return out
+
+
+def read_deal_matrix(path):
+    """Open a deal matrix (missing -> {}) and parse its first sheet."""
+    if not path or not os.path.exists(path):
+        return {}
+    wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
+    try:
+        return parse_matrix_rows(list(wb.worksheets[0].iter_rows(values_only=True)))
+    finally:
+        wb.close()
+
+
+def merge_matrix(row, matrix, source):
+    """manual_facts.csv wins; the matrix fills blanks. Returns disagreement warnings."""
+    warnings = []
+    for col, val in matrix.items():
+        have = parse_num(row.get(col))
+        if have is None:
+            row[col] = fmt(val)
+        elif abs(have - val) > 1e-6:
+            warnings.append(f"{row['site']}: {col} is {row[col]} in manual_facts.csv "
+                            f"but {fmt(val)} in {source}")
+    return warnings
+
+
 def compute(row, cfg):
     """Fill computed columns: all-in, gate, flags, placer ratio/pattern, composite."""
     th = cfg["thresholds"]
-    base, nnn, sf = parse_num(row.get("base_psf")), parse_num(row.get("nnn_psf")), parse_num(row.get("sf_target"))
+    base, nnn, sf = parse_num(row.get("base_psf")), parse_num(row.get("nnn_psf")), parse_num(row.get("sf"))
     allin = None
     if None not in (base, nnn, sf):
         allin = int(round((base + nnn) * sf / 12))
     row["total_rent"] = fmt(allin)
     row["psf_rent"] = fmt(base + nnn) if None not in (base, nnn) else "TODO"
 
-    ti, sf_ti = parse_num(row.get("psf_ti")), parse_num(row.get("sf_target"))
+    ti, sf_ti = parse_num(row.get("psf_ti")), parse_num(row.get("sf"))
     total_ti = None
     if None not in (ti, sf_ti):
         total_ti = int(round(ti * sf_ti))
@@ -302,8 +378,12 @@ def main():
     manual = {}
     if os.path.exists(manual_path):
         with open(manual_path, encoding="utf-8") as f:
-            for r in csv.DictReader(f):
+            reader = csv.DictReader(f)
+            for r in reader:
                 manual[r["site"].strip()] = r
+        if reader.fieldnames != ["site"] + MANUAL_PASSTHROUGH:
+            print("WARN: manual_facts.csv header differs from site + MANUAL_PASSTHROUGH "
+                  "(missing, extra or out-of-order columns)", file=sys.stderr)
     else:
         print(f"WARN: no manual_facts.csv at {manual_path}", file=sys.stderr)
 
@@ -322,8 +402,10 @@ def main():
         man = manual.get(display, {})
         for c in MANUAL_PASSTHROUGH:
             row[c] = (man.get(c) or "").strip()
-        row["gen"] = (man.get("generation") or "").strip()
-        row["psf_ti"] = (man.get("ti_psf") or "").strip()
+
+        matrix_path = latest_matrix(folder)
+        warnings += merge_matrix(row, read_deal_matrix(matrix_path),
+                                 os.path.basename(matrix_path or ""))
 
         sr = read_site_report(reports[0] if reports else None)  # None -> all TODO
         for k, v in sr.items():

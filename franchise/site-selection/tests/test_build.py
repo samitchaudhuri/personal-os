@@ -10,6 +10,7 @@ assertions fail loudly and tell you exactly which field broke.
 """
 import os
 import sys
+import tempfile
 import unittest
 
 import yaml
@@ -130,23 +131,23 @@ class TestCompute(unittest.TestCase):
         }
         for allin, expected in cases.items():
             # pick base/nnn/sf that yield this monthly all-in: (base+nnn)*sf/12 = allin
-            r = self._row(sf_target="1200", base_psf=str(allin * 12 / 1200), nnn_psf="0")
+            r = self._row(sf="1200", base_psf=str(allin * 12 / 1200), nnn_psf="0")
             bf.compute(r, self.cfg)
             self.assertEqual(r["gate_afford"], expected, f"allin={allin}")
 
     def test_gate_todo_when_missing(self):
-        r = self._row(sf_target="2000", base_psf="60", nnn_psf="TODO")
+        r = self._row(sf="2000", base_psf="60", nnn_psf="TODO")
         bf.compute(r, self.cfg)
         self.assertEqual(r["total_rent"], "TODO")
         self.assertEqual(r["gate_afford"], "TODO")
 
     def test_total_ti(self):
-        r = self._row(sf_target="2399", psf_ti="85")
+        r = self._row(sf="2399", psf_ti="85")
         bf.compute(r, self.cfg)
         self.assertEqual(r["total_ti"], "203915")
 
     def test_total_ti_todo_when_missing(self):
-        r = self._row(sf_target="2399", psf_ti="TODO")
+        r = self._row(sf="2399", psf_ti="TODO")
         bf.compute(r, self.cfg)
         self.assertEqual(r["total_ti"], "TODO")
 
@@ -156,32 +157,32 @@ class TestCompute(unittest.TestCase):
         self.assertEqual(r["psf_rent"], "55.08")
 
     def test_buildout_estimate_by_shell(self):
-        r = self._row(sf_target="2247", shell="cold_dark")
+        r = self._row(sf="2247", shell="cold_dark")
         bf.compute(r, self.cfg)
         self.assertEqual(r["psf_bo"], "175")
         self.assertEqual(r["total_bo"], "393225")
 
     def test_buildout_estimate_todo_when_shell_unknown(self):
-        r = self._row(sf_target="2247", shell="TODO")
+        r = self._row(sf="2247", shell="TODO")
         bf.compute(r, self.cfg)
         self.assertEqual(r["psf_bo"], "TODO")
         self.assertEqual(r["total_bo"], "TODO")
 
     def test_buildout_estimate_second_gen_fallback(self):
-        r = self._row(sf_target="2247", shell="TODO", gen="Second")
+        r = self._row(sf="2247", shell="TODO", gen="Second")
         bf.compute(r, self.cfg)
         self.assertEqual(r["psf_bo"], "140")
         self.assertEqual(r["total_bo"], "314580")
 
     def test_buildout_estimate_todo_when_first_gen_shell_unknown(self):
         # First-gen with an unclassified shell still has no fallback rate.
-        r = self._row(sf_target="2247", shell="TODO", gen="First")
+        r = self._row(sf="2247", shell="TODO", gen="First")
         bf.compute(r, self.cfg)
         self.assertEqual(r["psf_bo"], "TODO")
         self.assertEqual(r["total_bo"], "TODO")
 
     def test_bo_net_is_buildout_minus_ti(self):
-        r = self._row(sf_target="2348", shell="cold_dark", psf_ti="130")
+        r = self._row(sf="2348", shell="cold_dark", psf_ti="130")
         bf.compute(r, self.cfg)
         # total_bo = 175*2348 = 410900; total_ti = 130*2348 = 305240
         self.assertEqual(r["total_bo"], "410900")
@@ -189,7 +190,7 @@ class TestCompute(unittest.TestCase):
         self.assertEqual(r["bo_net"], "105660")
 
     def test_bo_net_todo_when_either_side_missing(self):
-        r = self._row(sf_target="2000", shell="vanilla", psf_ti="TODO")
+        r = self._row(sf="2000", shell="vanilla", psf_ti="TODO")
         bf.compute(r, self.cfg)
         self.assertEqual(r["bo_net"], "TODO")
 
@@ -245,6 +246,21 @@ class TestCompute(unittest.TestCase):
         self.assertAlmostEqual(sum(self.cfg["weights"].values()), 1.0, places=6)
 
 
+class TestColumnOrder(unittest.TestCase):
+    """manual_facts.csv mirrors combined_facts.csv's order so the two can be
+    checked side by side."""
+
+    def test_manual_columns_follow_output_order(self):
+        positions = [bf.COLUMNS.index(c) for c in bf.MANUAL_PASSTHROUGH]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_tier_and_open_mo_follow_bo_net(self):
+        i = bf.COLUMNS.index("bo_net")
+        self.assertEqual(bf.COLUMNS[i + 1:i + 3], ["tier", "open_mo"])
+        self.assertIn("tier", bf.MANUAL_PASSTHROUGH)
+        self.assertIn("open_mo", bf.MANUAL_PASSTHROUGH)
+
+
 class TestCompositeSortKey(unittest.TestCase):
     def test_sorts_descending_with_blanks_last(self):
         rows = [
@@ -256,6 +272,42 @@ class TestCompositeSortKey(unittest.TestCase):
         ]
         rows.sort(key=bf.composite_sort_key)
         self.assertEqual([r["composite"] for r in rows], ["5.5", "5.2", "4.7", "TODO", ""])
+
+
+class TestDealMatrix(unittest.TestCase):
+    """Rows as openpyxl yields them: label, then rounds oldest to newest."""
+
+    ROWS = [
+        ("Terms", "Morrow Hill Suggested Initial Proposal", "LL Counter", "Morrow Hill Suggested Counter"),
+        ("Size (sf)", 2247, 2247, None),
+        ("Initial Base Rent", "$56.00/SF", "$60.00/SF", "$58.00/SF"),
+        ("Expenses", "Est $30.00/SF NNN", "$33.21/SF NNN (includes promotional fee)", None),
+        ("Tenant Improvement Allowance", "$90/SF ($211,320.00)", "$110/SF($258,280.00)", "TBD"),
+        ("Security Deposit", "One (1) month's base rent", "TBD", None),
+    ]
+
+    def test_latest_round_with_a_value(self):
+        self.assertEqual(bf.parse_matrix_rows(self.ROWS),
+                         {"sf": 2247, "base_psf": 58.0, "nnn_psf": 33.21, "psf_ti": 110.0})
+
+    def test_missing_terms_are_absent(self):
+        self.assertEqual(bf.parse_matrix_rows([("Initial Base Rent", "TBD", None)]), {})
+
+    def test_latest_matrix_by_round(self):
+        with tempfile.TemporaryDirectory() as d:
+            for n in ("X - Deal Matrix.xlsx", "X - Deal Matrix-2.xlsx", "X - Deal Matrix-10.xlsx",
+                      "~$X - Deal Matrix-11.xlsx", "X - Rent Table-12.xlsx"):
+                open(os.path.join(d, n), "w").close()
+            self.assertEqual(os.path.basename(bf.latest_matrix(d)), "X - Deal Matrix-10.xlsx")
+            self.assertIsNone(bf.latest_matrix(os.path.join(d, "nowhere")))
+
+    def test_manual_wins_and_matrix_fills_blanks(self):
+        row = {"site": "SC Square", "sf": "2247", "base_psf": "57", "nnn_psf": "33.21", "psf_ti": ""}
+        warns = bf.merge_matrix(row, {"sf": 2247.0, "base_psf": 58.0, "nnn_psf": 33.21, "psf_ti": 75.0},
+                                "Deal Matrix-3.xlsx")
+        self.assertEqual((row["base_psf"], row["psf_ti"]), ("57", "75"))
+        self.assertEqual(len(warns), 1)
+        self.assertIn("base_psf is 57", warns[0])
 
 
 if __name__ == "__main__":

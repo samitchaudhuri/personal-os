@@ -34,8 +34,8 @@ placer:
   weekend_spike_ratio: 1.3      # ratio above this => "weekend-spike", else "uniform"
 
 # Build-out cost estimate by shell type (Anson Switzer, 2026-08-26). Coarse
-# pre-TI planning figure for candidates without a negotiated ti_psf yet (e.g.
-# early SF-Marin sites); once a real ti_psf lands, that figure is the one to
+# pre-TI planning figure for candidates without a negotiated psf_ti yet (e.g.
+# early SF-Marin sites); once a real psf_ti lands, that figure is the one to
 # trust. Shell type is read from each site's _page.md, "About the Space" ->
 # "Delivery" bullet (first-gen sites only; second-gen sites don't carry one).
 buildout_psf_by_shell:
@@ -53,15 +53,69 @@ buildout_psf_second_gen: 140
 ring_priority: ["3mi", "5mi", "1mi"]
 
 # Curated display names keyed by folder slug (VT Overview headers vary, so we
-# don't trust them for the canonical site name).
+# don't trust them for the canonical site name). The same name titles each
+# center's unit economics model copy: "ULC Unit Economic Model - <name>.xlsx".
 site_names:
   camden-park: "Camden Park"
   el-gato-village: "El Gato Village"
-  walnut-grove: "Walnut Grove"
+  junction: "Junction"              # VisionTrack lists it as "Walnut Grove/Station Building - The Junction"
   "1034-monroe": "1034 Monroe"
-  the-platform: "The Platform"
+  platform: "Platform"
   sc-square: "SC Square"
   the-clara: "The Clara"
   first-retail-center: "First Retail Center"
   gateway-crossing-orlo: "Gateway Crossing Orlo"
   prado: "Prado"
+
+# Unit economics model runner (site_model.py). Each center's model is a copy
+# of the current Baseline with only the site cells below changed. Site facts
+# come from combined_facts.csv by site name; results are read back from the
+# values Excel cached at save.
+unit_model:
+  models_dir: "gdrive/private/ULC-personal/Finance/Financial Models"
+  baseline: "ULC Unit Economic Model - Baseline v.Sept26.xlsx"
+  copy_name: "ULC Unit Economic Model - {site}.xlsx"
+  archive_dir: "Archive"
+
+  # open_mo is the opening month. The model starts 3 presales months earlier:
+  # the 3-Year IS hard-codes columns I:K as the presales period.
+  start_offset_months: -3
+
+  # Rent and security deposit (C146). Held at the franchisor's 33,000 for every
+  # site until Don weighs in; the leases say one month's rent.
+  deposit: 33000
+
+  # Presales rent and NNN (D129:D130): "zero" or "full" (= the C column).
+  # Column D covers all three presales months, so it's all or nothing.
+  presales_rent:
+    SC Square: zero   # earlier of opening or 180 days after delivery
+    Junction: zero    # 150 days after the later of permits and delivery (Anson; verify in revised LOI)
+    Platform: zero    # our counter: earlier of opening or 150 days after permits, cap 365 days after delivery
+
+  # Abatement has no model cell; the runner reports its value as upside.
+  abatement_months:
+    Platform: 3       # 3 months gross, after opening
+    Junction: 1       # 1 month gross, after opening
+
+  # Where each derived input is written. A target holding a formula is left
+  # alone: in v.Sept26, (PC) Inputs B29 points at (MSO) Inputs B29. Every
+  # target is checked against the intended value after recalculation.
+  # (PC) Inputs C23:D23 must match (MSO) Inputs, or the PC Lifeforce-fee
+  # HLOOKUP returns #N/A. Escalation (C131) stays the Baseline's shared 3%.
+  inputs:
+    tier:          [["(MSO) Inputs", "B29"], ["(PC) Inputs", "B29"]]
+    start_year:    [["(MSO) Inputs", "C23"], ["(PC) Inputs", "C23"]]
+    start_month:   [["(MSO) Inputs", "D23"], ["(PC) Inputs", "D23"]]
+    rent:          [["(MSO) Inputs", "C129"]]
+    rent_presales: [["(MSO) Inputs", "D129"]]
+    nnn:           [["(MSO) Inputs", "C130"]]
+    nnn_presales:  [["(MSO) Inputs", "D130"]]
+    deposit:       [["(MSO) Inputs", "C146"]]
+    net_leasehold: [["(MSO) Inputs", "C147"]]
+
+  results:
+    sheet: "(MSO) 3-Year IS"
+    years: ["C8", "D8", "E8"]         # model years: start year and the next two
+    ebitda: ["C118", "D118", "E118"]
+    cash_row: 128                     # peak cash = minimum of this row
+    payback: "I131"                   # payback month
