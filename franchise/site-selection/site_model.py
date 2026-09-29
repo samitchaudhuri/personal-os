@@ -216,7 +216,7 @@ def ensure_copy(cfg, site, out=None, baseline=None, rebuild=False):
     src = baseline or os.path.join(models, um["baseline"])
     if rebuild and os.path.exists(dest):
         stem = os.path.splitext(os.path.basename(dest))[0]
-        archived = os.path.join(models, um["archive_dir"],
+        archived = os.path.join(repo_path(um["archive_dir"]),
                                 f"{stem} {datetime.date.today():%Y-%m-%d}.xlsx")
         if os.path.exists(archived):
             raise SystemExit(f"{archived} already exists")

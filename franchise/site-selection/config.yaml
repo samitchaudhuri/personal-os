@@ -72,10 +72,12 @@ site_names:
 # come from combined_facts.csv by site name; results are read back from the
 # values Excel cached at save.
 unit_model:
-  models_dir: "gdrive/private/ULC-personal/Finance/Financial Models"
+  models_dir: "gdrive/shared/ULC-franchisor/Finance/Financial Models"
   baseline: "ULC Unit Economic Model - Baseline v.Sept26.xlsx"
   copy_name: "ULC Unit Economic Model - {site}.xlsx"
-  archive_dir: "Archive"
+  # Superseded copies go to the private drive, so archiving takes them out of
+  # the folder shared with the franchisor.
+  archive_dir: "gdrive/private/ULC-personal/Finance/Financial Models/Archive"
 
   # open_mo is the opening month. The model starts 3 presales months earlier:
   # the 3-Year IS hard-codes columns I:K as the presales period.
