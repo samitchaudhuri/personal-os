@@ -62,7 +62,10 @@ via the repo symlink). Change behavior there, not in the code.
 
 Each center's unit economics model is a copy of the current Baseline with only
 its site cells changed, so the franchisor's assumptions stay identical across
-sites and the results differ only by lease, tier and timing. `site_model.py`
+sites and the results differ only by lease, tier and timing. The Baseline is an
+unchanged copy of the franchisor's `ULC Unit Economic Model v.Sept26`, made with
+`cp -X` and `chmod u+w`, with no local price overlay. When the franchisor issues
+a new model, copy it over the Baseline, then run each site with `--rebuild`. `site_model.py`
 writes those cells from the site's `combined_facts.csv` row and reads the
 results back:
 
