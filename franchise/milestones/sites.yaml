@@ -1,0 +1,21 @@
+# Per-site inputs and the fixed limits the generator flags against. An input is
+# a date or an [earliest, latest] pair. Contract dates are copied from
+# `ULC Franchise Project.md#Contract dates` and are not derived here.
+owner:
+  away: [2026-12-14, 2027-01-13]
+
+sites:
+  junction:
+    title: Junction
+    inputs:
+      kickoff-call: [2026-10-08, 2026-10-15]
+      lease-signed: 2026-11-30      # target, set 10/6 with Lynnsee Starr
+      landlord-delivery: 2027-04-01 # tentative, April 2027 per Greg on 8/27
+    limits:
+      site_acquisition_deadline: 2026-11-09
+      site_acquisition_extended: 2027-02-07
+      opening_deadline: 2027-05-12
+      opening_extension_fee_per_month: 2500
+      gm_hard_stop: 2026-12-11
+    basis:
+      lease-signed: Target pending the 10/6 call, and any date after 2026-11-09 needs the one-time extension

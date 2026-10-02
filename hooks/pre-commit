@@ -30,6 +30,10 @@ if echo "$STAGED" | grep -q '^franchise/site-selection/'; then
   run_tool_tests "franchise/site-selection" "site-selection"
 fi
 
+if echo "$STAGED" | grep -q '^franchise/milestones/'; then
+  run_tool_tests "franchise/milestones" "milestones"
+fi
+
 if echo "$STAGED" | grep -q '^inbound-feeds/'; then
   run_tool_tests "inbound-feeds" "inbound-feeds"
 fi

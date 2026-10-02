@@ -1,0 +1,115 @@
+# One row per milestone. A milestone is either an input a site supplies in
+# sites.yaml, or sits `offset_days` [earliest, latest] from another milestone
+# (negative means before). Keys are the stable names that goals and targets
+# link to in the vault; never rename one without updating those links.
+# gantt_row is the row in `ULC Center Opening Timeline.xlsx`, blank where the
+# template has no bar.
+milestones:
+  - key: kickoff-call
+    label: Presale kickoff call
+    gantt_row: 34
+    input: true
+    basis: Elise Budowanec has not scheduled it, and the task asks Michelle Tomko to step in after 10/8
+
+  - key: lease-signed
+    label: Lease signed
+    gantt_row: 24
+    input: true
+    basis: The draft from Anson Switzer is due 10/16, and lender and franchisor approvals run in parallel
+
+  - key: gm-in-seat
+    label: GM in seat
+    gantt_row: 32
+    anchor: lease-signed
+    offset_days: [0, 0]
+    basis: Starts with the lease so presale groundwork has an owner, and corporate reviews the GM's goals weekly
+
+  - key: gm-recruiting
+    label: GM recruiting begins
+    gantt_row: 32
+    anchor: gm-in-seat
+    offset_days: [-60, -45]
+    basis: Five to six weeks to an accepted offer plus a two to four week notice period
+
+  - key: permits-submitted
+    label: Permits submitted
+    gantt_row: 26
+    anchor: lease-signed
+    offset_days: [0, 60]
+    basis: The Counter LOI gives 60 days after the lease to submit, and permits should be issued before landlord delivery
+
+  - key: landlord-delivery
+    label: Landlord delivers the suite
+    gantt_row:
+    input: true
+    basis: Greg supplied April 2027 availability on 8/27, not yet a committed date
+
+  - key: construction-start
+    label: Buildout starts
+    gantt_row: 27
+    anchor: landlord-delivery
+    offset_days: [0, 0]
+    basis: Starts on delivery, with permitting finished before it, as the template starts construction after the lease signs
+
+  - key: rent-commences
+    label: Rent commences
+    gantt_row:
+    anchor: landlord-delivery
+    offset_days: [150, 150]
+    basis: The Counter LOI starts rent 150 days after the later of permit receipt and delivery, which is delivery when permits come first
+
+  - key: lighting-flooring
+    label: Lighting and flooring delivered
+    gantt_row: 28
+    anchor: construction-start
+    offset_days: [42, 42]
+    basis: Template puts it six weeks into the build, week of 12/30 against a 11/18 start
+
+  - key: equipment-delivered
+    label: Equipment, A/V and millwork install starts
+    gantt_row: 29
+    anchor: construction-start
+    offset_days: [91, 91]
+    basis: Template starts install 13 weeks into the build and finishes it the week of 2/24, to confirm with MMP
+
+  - key: equipment-ordered
+    label: Equipment ordered
+    gantt_row: 25
+    anchor: equipment-delivered
+    offset_days: [-84, -84]
+    basis: ULC's estimate for MMP, who takes the date from ULC and starts the draw from it. It is the latest order date for the A/V package's 12-week lead time, and the template orders earlier, before construction starts
+
+  - key: build-complete
+    label: Certificate of occupancy issued
+    gantt_row: 30
+    anchor: construction-start
+    offset_days: [105, 105]
+    basis: Template issues it 15 weeks after construction starts, week of 3/3 against a 11/18 start
+
+  - key: soft-open
+    label: Soft open
+    gantt_row: 49
+    anchor: construction-start
+    offset_days: [112, 112]
+    basis: Template opens 16 weeks after construction starts, 3/10 against 11/18, which matches the Junction model's July 2027
+
+  - key: presale-launch
+    label: Presale launch
+    gantt_row:
+    anchor: soft-open
+    offset_days: [-150, -90]
+    basis: The playbook puts launch three to five months before opening
+
+  - key: vip-start
+    label: VIP lead phase starts
+    gantt_row: 38
+    anchor: presale-launch
+    offset_days: [-42, -42]
+    basis: About six weeks before launch
+
+  - key: grand-opening
+    label: Grand opening
+    gantt_row:
+    anchor: soft-open
+    offset_days: [42, 56]
+    basis: Six to eight weeks after soft open
