@@ -9,7 +9,7 @@ milestones:
     label: Presale kickoff call
     gantt_row: 34
     input: true
-    basis: Elise Budowanec has not scheduled it, and the task asks Michelle Tomko to step in after 10/8
+    basis: Elise Budowanec has not scheduled it, and Michelle Tomko's 10/2 email asks for Kite setup first but gives no date
 
   - key: lease-signed
     label: Lease signed
