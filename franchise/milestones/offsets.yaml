@@ -20,23 +20,22 @@ milestones:
   - key: gm-sourcing
     label: GM sourcing begins
     gantt_row: 32
-    anchor: gm-offer-accepted
-    offset_days: [-42, -35]
-    basis: Five to six weeks from the start of the search to an accepted offer
+    input: true
+    basis: Fibr, the recruiter ULC sponsors, starts the search, and the site supplies the date
 
   - key: gm-offer-accepted
     label: GM offer accepted
     gantt_row: 32
-    anchor: gm-in-seat
-    offset_days: [-28, -14]
-    basis: Two to four weeks of notice before the start date, and Michelle's checkpoint for an accepted offer is 10/31
+    anchor: gm-sourcing
+    offset_days: [35, 42]
+    basis: Five to six weeks from the start of the search to an accepted offer, and Michelle's checkpoint for an accepted offer is 10/31
 
   - key: gm-in-seat
     label: GM in seat
     gantt_row: 32
-    anchor: lease-signed
-    offset_days: [-15, 0]
-    basis: Starts up to two weeks before the lease so presale groundwork has an owner, and corporate reviews the GM's goals weekly
+    anchor: gm-offer-accepted
+    offset_days: [14, 28]
+    basis: Two to four weeks of notice between the accepted offer and the start date, and corporate reviews the GM's goals weekly
 
   - key: permits-submitted
     label: Permits submitted

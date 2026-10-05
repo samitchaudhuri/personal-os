@@ -29,14 +29,14 @@ class TestResolve(unittest.TestCase):
         self.assertEqual(r["lease-signed"], (D(2026, 11, 30), D(2026, 11, 30)))
         self.assertEqual(r["kickoff-call"], (D(2026, 10, 9), D(2026, 10, 9)))
 
-    def test_gm_in_seat_follows_lease(self):
-        self.assertEqual(junction()["gm-in-seat"], (D(2026, 11, 15), D(2026, 11, 30)))
+    def test_sourcing_is_a_site_input(self):
+        self.assertEqual(junction()["gm-sourcing"], (D(2026, 10, 5), D(2026, 10, 5)))
 
-    def test_offer_accepted_is_two_to_four_weeks_before_start(self):
-        self.assertEqual(junction()["gm-offer-accepted"], (D(2026, 10, 18), D(2026, 11, 16)))
+    def test_offer_accepted_is_five_to_six_weeks_after_sourcing(self):
+        self.assertEqual(junction()["gm-offer-accepted"], (D(2026, 11, 9), D(2026, 11, 16)))
 
-    def test_sourcing_starts_five_to_six_weeks_before_the_offer(self):
-        self.assertEqual(junction()["gm-sourcing"], (D(2026, 9, 6), D(2026, 10, 12)))
+    def test_gm_in_seat_is_two_to_four_weeks_after_the_offer(self):
+        self.assertEqual(junction()["gm-in-seat"], (D(2026, 11, 23), D(2026, 12, 14)))
 
     def test_forward_chain_uses_template_durations(self):
         r = junction()
@@ -74,9 +74,9 @@ class TestResolve(unittest.TestCase):
         inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 5, 1)})
         self.assertEqual(ms.resolve(OFFSETS, inputs)["soft-open"][0], D(2027, 8, 21))
 
-    def test_slipping_the_lease_moves_the_gm(self):
-        inputs = dict(JUNCTION["inputs"], **{"lease-signed": D(2027, 1, 15)})
-        self.assertEqual(ms.resolve(OFFSETS, inputs)["gm-in-seat"][0], D(2026, 12, 31))
+    def test_slipping_sourcing_moves_the_gm(self):
+        inputs = dict(JUNCTION["inputs"], **{"gm-sourcing": D(2026, 10, 12)})
+        self.assertEqual(ms.resolve(OFFSETS, inputs)["gm-in-seat"][0], D(2026, 11, 30))
 
     def test_missing_input_is_an_error(self):
         inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "landlord-delivery"}
@@ -111,7 +111,7 @@ class TestFlags(unittest.TestCase):
         self.assertIn("one-time 90-day extension", m["lease-signed"])
         self.assertIn("3 months past", m["soft-open"])
         self.assertIn("$7,500", m["soft-open"])
-        self.assertNotIn("gm-in-seat", m)
+        self.assertIn("hard stop", m["gm-in-seat"])
 
     def test_lease_before_deadline_is_clean(self):
         r = dict(junction(), **{"lease-signed": (D(2026, 11, 2), D(2026, 11, 2))})

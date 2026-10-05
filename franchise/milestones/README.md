@@ -4,7 +4,7 @@ Computes a site's milestone dates from one offsets file, so the Junction milesto
 
 ## Files
 
-`offsets.yaml` holds one row per milestone. A milestone is an input that a site supplies, or sits an offset range in days from another milestone. The forward chain runs from landlord delivery through buildout and inspection to soft open, and the backward chain runs from soft open to presale launch, the VIP phase and the GM. Keys are stable names that vault goals and targets link to.
+`offsets.yaml` holds one row per milestone. A milestone is an input that a site supplies, or sits an offset range in days from another milestone. The forward chain runs from landlord delivery through buildout and inspection to soft open, the backward chain runs from soft open to presale launch and the VIP phase, and the GM chain runs forward from the sourcing date a site supplies. Keys are stable names that vault goals and targets link to.
 
 `sites.yaml` holds each site's inputs, such as the lease signing target and the soft-open date, plus the contract limits the generator flags against. The contract dates are copied from the vault's Contract dates table and are not derived.
 
