@@ -9,7 +9,7 @@ milestones:
     label: Presale kickoff call
     gantt_row: 34
     input: true
-    basis: Elise Budowanec has not scheduled it, and Michelle Tomko's 10/2 email asks for Kite setup first but gives no date
+    basis: Elise Budowanec offered three slots on 10/5 and Samit accepted Friday 10/9 at 11:30 AM PT with Don Michael, Michelle Tomko and Elise
 
   - key: lease-signed
     label: Lease signed
@@ -17,19 +17,26 @@ milestones:
     input: true
     basis: The draft from Anson Switzer is due 10/16, and lender and franchisor approvals run in parallel
 
+  - key: gm-sourcing
+    label: GM sourcing begins
+    gantt_row: 32
+    anchor: gm-offer-accepted
+    offset_days: [-42, -35]
+    basis: Five to six weeks from the start of the search to an accepted offer
+
+  - key: gm-offer-accepted
+    label: GM offer accepted
+    gantt_row: 32
+    anchor: gm-in-seat
+    offset_days: [-28, -14]
+    basis: Two to four weeks of notice before the start date, and Michelle's checkpoint for an accepted offer is 10/31
+
   - key: gm-in-seat
     label: GM in seat
     gantt_row: 32
     anchor: lease-signed
-    offset_days: [0, 0]
-    basis: Starts with the lease so presale groundwork has an owner, and corporate reviews the GM's goals weekly
-
-  - key: gm-recruiting
-    label: GM recruiting begins
-    gantt_row: 32
-    anchor: gm-in-seat
-    offset_days: [-60, -45]
-    basis: Five to six weeks to an accepted offer plus a two to four week notice period
+    offset_days: [-15, 0]
+    basis: Starts up to two weeks before the lease so presale groundwork has an owner, and corporate reviews the GM's goals weekly
 
   - key: permits-submitted
     label: Permits submitted

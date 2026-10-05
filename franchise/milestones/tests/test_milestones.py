@@ -27,14 +27,16 @@ class TestResolve(unittest.TestCase):
     def test_inputs_pass_through(self):
         r = junction()
         self.assertEqual(r["lease-signed"], (D(2026, 11, 30), D(2026, 11, 30)))
-        self.assertEqual(r["kickoff-call"], (D(2026, 10, 8), D(2026, 10, 15)))
+        self.assertEqual(r["kickoff-call"], (D(2026, 10, 9), D(2026, 10, 9)))
 
     def test_gm_in_seat_follows_lease(self):
-        self.assertEqual(junction()["gm-in-seat"], (D(2026, 11, 30), D(2026, 11, 30)))
+        self.assertEqual(junction()["gm-in-seat"], (D(2026, 11, 15), D(2026, 11, 30)))
 
-    def test_recruiting_starts_in_october(self):
-        lo, hi = junction()["gm-recruiting"]
-        self.assertEqual((lo, hi), (D(2026, 10, 1), D(2026, 10, 16)))
+    def test_offer_accepted_is_two_to_four_weeks_before_start(self):
+        self.assertEqual(junction()["gm-offer-accepted"], (D(2026, 10, 18), D(2026, 11, 16)))
+
+    def test_sourcing_starts_five_to_six_weeks_before_the_offer(self):
+        self.assertEqual(junction()["gm-sourcing"], (D(2026, 9, 6), D(2026, 10, 12)))
 
     def test_forward_chain_uses_template_durations(self):
         r = junction()
@@ -74,7 +76,7 @@ class TestResolve(unittest.TestCase):
 
     def test_slipping_the_lease_moves_the_gm(self):
         inputs = dict(JUNCTION["inputs"], **{"lease-signed": D(2027, 1, 15)})
-        self.assertEqual(ms.resolve(OFFSETS, inputs)["gm-in-seat"][0], D(2027, 1, 15))
+        self.assertEqual(ms.resolve(OFFSETS, inputs)["gm-in-seat"][0], D(2026, 12, 31))
 
     def test_missing_input_is_an_error(self):
         inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "landlord-delivery"}

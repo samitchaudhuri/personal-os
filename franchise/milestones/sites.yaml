@@ -8,7 +8,7 @@ sites:
   junction:
     title: Junction
     inputs:
-      kickoff-call: [2026-10-08, 2026-10-15]
+      kickoff-call: 2026-10-09      # scheduled by Elise, 11:30 AM PT
       lease-signed: 2026-11-30      # target, set 10/6 with Lynnsee Starr
       landlord-delivery: 2027-04-01 # tentative, April 2027 per Greg on 8/27
     limits:
