@@ -67,7 +67,7 @@ is missing, run Connect. If the API returns 401 or 403 after a refresh, run
 
 ## Turning Gmail into vault notes
 
-Management Intake Processing pulls messages from the ULC Gmail and Personal Gmail accounts into the vault as notes before anyone processes them. The pull can cover up to a week of messages, so it calls the Gmail API in a way that stays under Gmail's request budget instead of fetching the whole week in one burst.
+Batch Intake pulls messages from the ULC Gmail and Personal Gmail accounts into the vault as notes before anyone processes them. The pull can cover up to a week of messages, so it calls the Gmail API in a way that stays under Gmail's request budget instead of fetching the whole week in one burst.
 
 The workflow is triggered in the agent chat through trigger phrases such as `pull raw inputs` or `process raw inputs`. They lead to running the `intake.py` script against a Gmail source through the following commands:
 
