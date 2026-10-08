@@ -28,11 +28,14 @@ See the method + design note in the vault:
   `*_score` (1-7) values, and `co_tenants, notes`. The file's columns follow
   `MANUAL_PASSTHROUGH` in `build_facts.py`, which keeps the same order as
   `combined_facts.csv`; the build warns if the header drifts.
-- Filled from the deal matrix: when `sf`, `base_psf`, `nnn_psf` or `psf_ti` is
-  blank in `manual_facts.csv`, the build takes it from the site's
-  highest-numbered `*Deal Matrix*.xlsx`, using the latest round that has a
-  value. The manual value wins when both exist, and the build warns if they
-  disagree, so a stale manual row shows up after each new counter.
+- Filled from the deal matrix: a `manual_facts.csv` cell holding the word
+  `matrix` in `sf`, `base_psf`, `nnn_psf` or `psf_ti` takes its value from the
+  site's highest-numbered `*Deal Matrix*.xlsx`, using the latest round that has
+  a value. The build stops with an error when the site has no matrix or the
+  matrix has no value for that term. A number in the cell is a hand entry that
+  wins over the matrix, and the build warns if they disagree, so a stale manual
+  row shows up after each new counter. A blank cell is a gap and gets a warning;
+  it is never filled from the matrix.
 - Computed (here): `total_rent`, `total_ti`, `gate_afford`, the four `flag_*`,
   `placer_weekend_ratio`, `placer_pattern`, `composite`.
 
@@ -169,7 +172,9 @@ What they pin down:
   weights sum to 1.0. `afford_preferred` (12500) and `afford_comfortable`
   (10000) are informational bands for reports, not gate cutoffs.
 - Deal matrix: the latest round with a value wins per term, the
-  highest-numbered file wins per site, and manual values beat matrix values.
+  highest-numbered file wins per site, a `matrix` cell takes the matrix value
+  or fails the build, a manual number beats the matrix with a warning, and a
+  blank cell warns and stays blank.
 - Model runner: the input derivations with SC Square and Junction as golden
   values, the start month wrapping into the prior year, the cell map, the
   generated AppleScript's order of operations and quoting, and the result

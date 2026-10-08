@@ -301,13 +301,40 @@ class TestDealMatrix(unittest.TestCase):
             self.assertEqual(os.path.basename(bf.latest_matrix(d)), "X - Deal Matrix-10.xlsx")
             self.assertIsNone(bf.latest_matrix(os.path.join(d, "nowhere")))
 
-    def test_manual_wins_and_matrix_fills_blanks(self):
-        row = {"site": "SC Square", "sf": "2247", "base_psf": "57", "nnn_psf": "33.21", "psf_ti": ""}
-        warns = bf.merge_matrix(row, {"sf": 2247.0, "base_psf": 58.0, "nnn_psf": 33.21, "psf_ti": 75.0},
-                                "Deal Matrix-3.xlsx")
-        self.assertEqual((row["base_psf"], row["psf_ti"]), ("57", "75"))
+    def test_row_shape_warnings(self):
+        ok = {"site": "X", "sf": "1", "notes": "n"}
+        self.assertEqual(bf.row_shape_warnings(ok), [])
+        self.assertIn("2 extra cell(s)", bf.row_shape_warnings({**ok, None: ["a", "b"]})[0])
+        self.assertIn("fewer cells", bf.row_shape_warnings(dict(ok, notes=None))[0])
+
+    MATRIX = {"sf": 2247.0, "base_psf": 58.0, "nnn_psf": 33.21, "psf_ti": 75.0}
+
+    def test_sentinel_takes_the_matrix_value(self):
+        row = {"site": "X", "sf": "matrix", "base_psf": "Matrix", "nnn_psf": "matrix", "psf_ti": "matrix"}
+        self.assertEqual(bf.merge_matrix(row, self.MATRIX, "M.xlsx"), ([], []))
+        self.assertEqual((row["sf"], row["base_psf"], row["psf_ti"]), ("2247", "58", "75"))
+
+    def test_sentinel_without_a_matrix_value_is_an_error(self):
+        row = {"site": "X", "sf": "matrix", "base_psf": "58", "nnn_psf": "33.21", "psf_ti": "75"}
+        warns, errs = bf.merge_matrix(row, {}, "")
+        self.assertEqual(warns, [])
+        self.assertEqual(len(errs), 1)
+        self.assertIn("sf is `matrix`", errs[0])
+        self.assertEqual(row["sf"], "")
+
+    def test_manual_number_wins_and_warns_on_disagreement(self):
+        row = {"site": "X", "sf": "2247", "base_psf": "57", "nnn_psf": "33.21", "psf_ti": "75"}
+        warns, errs = bf.merge_matrix(row, self.MATRIX, "M.xlsx")
+        self.assertEqual((row["base_psf"], errs), ("57", []))
         self.assertEqual(len(warns), 1)
         self.assertIn("base_psf is 57", warns[0])
+
+    def test_blank_is_a_gap_and_is_not_filled(self):
+        row = {"site": "X", "sf": "2247", "base_psf": "58", "nnn_psf": "33.21", "psf_ti": ""}
+        warns, errs = bf.merge_matrix(row, self.MATRIX, "M.xlsx")
+        self.assertEqual((row["psf_ti"], errs), ("", []))
+        self.assertEqual(len(warns), 1)
+        self.assertIn("psf_ti is blank", warns[0])
 
 
 if __name__ == "__main__":

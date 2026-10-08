@@ -263,17 +263,47 @@ def read_deal_matrix(path):
         wb.close()
 
 
+MATRIX_SENTINEL = "matrix"
+
+
+def row_shape_warnings(row):
+    """Warn when a manual_facts.csv row has extra or missing cells, usually an unquoted comma."""
+    site = (row.get("site") or "?").strip()
+    extra = row.get(None) or []
+    if extra:
+        return [f"{site}: manual_facts.csv row has {len(extra)} extra cell(s), "
+                "likely an unquoted comma in a text cell"]
+    if any(v is None for v in row.values()):
+        return [f"{site}: manual_facts.csv row has fewer cells than the header"]
+    return []
+
+
 def merge_matrix(row, matrix, source):
-    """manual_facts.csv wins; the matrix fills blanks. Returns disagreement warnings."""
-    warnings = []
-    for col, val in matrix.items():
-        have = parse_num(row.get(col))
-        if have is None:
-            row[col] = fmt(val)
-        elif abs(have - val) > 1e-6:
-            warnings.append(f"{row['site']}: {col} is {row[col]} in manual_facts.csv "
-                            f"but {fmt(val)} in {source}")
-    return warnings
+    """Resolve the four lease fields against the deal matrix.
+
+    A cell holding `matrix` takes the matrix value, and a missing value is an error.
+    A number is a hand entry that wins, with a warning when the matrix disagrees.
+    A blank is a gap and only warns. Returns (warnings, errors).
+    """
+    warnings, errors = [], []
+    for col in MATRIX_TERMS.values():
+        cell = (row.get(col) or "").strip()
+        if cell.lower() == MATRIX_SENTINEL:
+            if col in matrix:
+                row[col] = fmt(matrix[col])
+            else:
+                row[col] = ""
+                errors.append(f"{row['site']}: {col} is `{MATRIX_SENTINEL}` in manual_facts.csv "
+                              f"but {source or 'no deal matrix'} has no value for it")
+        elif not cell:
+            warnings.append(f"{row['site']}: {col} is blank in manual_facts.csv "
+                            f"(enter a number or `{MATRIX_SENTINEL}`)")
+        elif col in matrix:
+            have = parse_num(cell)
+            if have is not None and abs(have - matrix[col]) > 1e-6:
+                warnings.append(f"{row['site']}: {col} is {cell} in manual_facts.csv "
+                                f"but {fmt(matrix[col])} in {source}")
+    return warnings, errors
 
 
 def compute(row, cfg):
@@ -381,6 +411,8 @@ def main():
             reader = csv.DictReader(f)
             for r in reader:
                 manual[r["site"].strip()] = r
+                for w in row_shape_warnings(r):
+                    print(f"WARN: {w}", file=sys.stderr)
         if reader.fieldnames != ["site"] + MANUAL_PASSTHROUGH:
             print("WARN: manual_facts.csv header differs from site + MANUAL_PASSTHROUGH "
                   "(missing, extra or out-of-order columns)", file=sys.stderr)
@@ -391,7 +423,7 @@ def main():
                    if os.path.isdir(os.path.join(base, d))
                    and d != cfg["comparison_dir"] and not d.startswith("."))
 
-    rows, warnings = [], []
+    rows, warnings, errors = [], [], []
     for slug in slugs:
         folder = os.path.join(base, slug)
         display = names.get(slug, slug)
@@ -404,8 +436,11 @@ def main():
             row[c] = (man.get(c) or "").strip()
 
         matrix_path = latest_matrix(folder)
-        warnings += merge_matrix(row, read_deal_matrix(matrix_path),
-                                 os.path.basename(matrix_path or ""))
+        if display in manual:
+            w, e = merge_matrix(row, read_deal_matrix(matrix_path),
+                                os.path.basename(matrix_path or ""))
+            warnings += w
+            errors += e
 
         sr = read_site_report(reports[0] if reports else None)  # None -> all TODO
         for k, v in sr.items():
@@ -427,6 +462,10 @@ def main():
 
     for w in warnings:
         print(f"WARN: {w}", file=sys.stderr)
+    for e in errors:
+        print(f"ERROR: {e}", file=sys.stderr)
+    if errors:
+        sys.exit(1)
 
     if args.dry_run:
         wtr = csv.DictWriter(sys.stdout, fieldnames=COLUMNS)
