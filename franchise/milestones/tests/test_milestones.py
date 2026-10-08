@@ -26,17 +26,17 @@ def junction():
 class TestResolve(unittest.TestCase):
     def test_inputs_pass_through(self):
         r = junction()
-        self.assertEqual(r["lease-signed"], (D(2026, 11, 30), D(2026, 11, 30)))
+        self.assertEqual(r["lease-signed"], (D(2026, 11, 30), D(2026, 12, 15)))
         self.assertEqual(r["kickoff-call"], (D(2026, 10, 9), D(2026, 10, 9)))
 
     def test_sourcing_is_a_site_input(self):
-        self.assertEqual(junction()["gm-sourcing"], (D(2026, 10, 5), D(2026, 10, 5)))
+        self.assertEqual(junction()["gm-sourcing"], (D(2026, 10, 6), D(2026, 10, 6)))
 
-    def test_offer_accepted_is_five_to_six_weeks_after_sourcing(self):
-        self.assertEqual(junction()["gm-offer-accepted"], (D(2026, 11, 9), D(2026, 11, 16)))
+    def test_offer_accepted_is_45_days_after_sourcing(self):
+        self.assertEqual(junction()["gm-offer-accepted"], (D(2026, 11, 20), D(2026, 11, 20)))
 
     def test_gm_in_seat_is_two_to_four_weeks_after_the_offer(self):
-        self.assertEqual(junction()["gm-in-seat"], (D(2026, 11, 23), D(2026, 12, 14)))
+        self.assertEqual(junction()["gm-in-seat"], (D(2026, 12, 4), D(2026, 12, 18)))
 
     def test_forward_chain_uses_template_durations(self):
         r = junction()
@@ -62,7 +62,7 @@ class TestResolve(unittest.TestCase):
         self.assertEqual(junction()["rent-commences"], (D(2027, 8, 29), D(2027, 8, 29)))
 
     def test_permits_submitted_within_60_days_of_lease(self):
-        self.assertEqual(junction()["permits-submitted"], (D(2026, 11, 30), D(2027, 1, 29)))
+        self.assertEqual(junction()["permits-submitted"], (D(2026, 11, 30), D(2027, 2, 13)))
 
     def test_backward_chain_from_soft_open(self):
         r = junction()
@@ -76,7 +76,7 @@ class TestResolve(unittest.TestCase):
 
     def test_slipping_sourcing_moves_the_gm(self):
         inputs = dict(JUNCTION["inputs"], **{"gm-sourcing": D(2026, 10, 12)})
-        self.assertEqual(ms.resolve(OFFSETS, inputs)["gm-in-seat"][0], D(2026, 11, 30))
+        self.assertEqual(ms.resolve(OFFSETS, inputs)["gm-in-seat"][0], D(2026, 12, 10))
 
     def test_missing_input_is_an_error(self):
         inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "landlord-delivery"}
@@ -138,7 +138,7 @@ class TestRender(unittest.TestCase):
 
     def test_site_basis_overrides_default(self):
         table = ms.render_table(OFFSETS, junction(), JUNCTION["basis"])
-        self.assertIn("pending the 10/6 call", table)
+        self.assertIn("45 to 60 days", table)
 
     def test_point_and_range_formats(self):
         self.assertEqual(ms.fmt((D(2026, 11, 30), D(2026, 11, 30))), "2026-11-30")

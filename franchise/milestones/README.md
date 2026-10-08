@@ -26,4 +26,4 @@ cd franchise/milestones && ./.venv/bin/python -m unittest discover -s tests
 
 ## Not built yet
 
-A permit-received date and permit review time, and Mark's and MMP's confirmation of the template's buildout durations. The Gantt CSV for `ulc-timeline-csv`. A second site and the combined table with sites as columns. Markers in the vault note, so `--write` has not been run against it.
+A permit-received date and permit review time, and Mark's and MMP's confirmation of the template's buildout durations. The Gantt CSV for `ulc-timeline-csv`. A second site and the combined table with sites as columns.

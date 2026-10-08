@@ -15,7 +15,7 @@ milestones:
     label: Lease signed
     gantt_row: 24
     input: true
-    basis: The draft from Anson Switzer is due 10/16, and lender and franchisor approvals run in parallel
+    basis: The draft from Anson Switzer is due 10/15, and lender and franchisor approvals run in parallel
 
   - key: gm-sourcing
     label: GM sourcing begins
@@ -27,8 +27,8 @@ milestones:
     label: GM offer accepted
     gantt_row: 32
     anchor: gm-sourcing
-    offset_days: [35, 42]
-    basis: Five to six weeks from the start of the search to an accepted offer, and Michelle's checkpoint for an accepted offer is 10/31
+    offset_days: [45, 45]
+    basis: Regan Hahn at Fibr quoted 45 days from the start of the search to an accepted offer on the 10/7 call, which Samit confirmed, and Michelle's checkpoint for an accepted offer is 10/31
 
   - key: gm-in-seat
     label: GM in seat
