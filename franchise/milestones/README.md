@@ -10,11 +10,19 @@ Computes a site's milestone dates from one offsets file, so the Junction milesto
 
 `milestones.py` resolves the chains as date ranges and prints the table. With `--write NOTE` it rewrites the block between `<!-- milestones:SITE:start -->` and `<!-- milestones:SITE:end -->` in that note and fails if the markers are missing.
 
+`timeline_csv.py` exports the opening timeline workbook to a CSV for a Gantt tool, one row per task with its group, category, bar start and end, and proposed predecessors from `timeline-dependencies.yaml`. With `--site` it adds the milestone key and the generator's estimate beside the bar for each row that `offsets.yaml` maps. The bars are the template's sample timeline shifted to the workbook's anchor date in B2, so the estimate columns are the Junction dates and the start and end columns are not.
+
 ## Run
 
 ```bash
 cd franchise/milestones && ./.venv/bin/python milestones.py junction
 ```
+
+```bash
+cd franchise/milestones && ./.venv/bin/python timeline_csv.py --site junction --out "../../gdrive/private/ULC-personal/Development/Opening Timeline/ULC Los Gatos Opening Timeline.csv"
+```
+
+For TeamGantt, add `--teamgantt` to write its work-breakdown layout, with WBS numbers as predecessors. Its free plan holds 40 tasks and the workbook has 41, so `--skip 13` drops the optional DBA row; the script warns when the count exceeds 40.
 
 Flags go to stderr: a lease date after the Site Acquisition Deadline, a soft open past the Opening Deadline with the extension fee, a GM date after the hard stop before the owner's absence, and any milestone wholly inside that absence.
 
@@ -26,4 +34,4 @@ cd franchise/milestones && ./.venv/bin/python -m unittest discover -s tests
 
 ## Not built yet
 
-A permit-received date and permit review time, and Mark's and MMP's confirmation of the template's buildout durations. The Gantt CSV for `ulc-timeline-csv`. A second site and the combined table with sites as columns.
+A permit-received date and permit review time, and Mark's and MMP's confirmation of the template's buildout durations. A second site and the combined table with sites as columns.
