@@ -4,8 +4,36 @@
 # link to in the vault; never rename one without updating those links.
 # gantt_row is the row in `ULC Center Opening Timeline.xlsx`, blank where the
 # template has no bar.
+#
+# A phase is the span between two milestones with a planned duration in days
+# [shortest, longest]. A milestone with `from_phase` is derived forward from
+# that phase's start plus its duration, unless the site pins a date for it in
+# sites.yaml. The generator flags any phase whose actual span falls outside its
+# planned range, including a phase whose end comes from another chain.
+phases:
+  - key: presale-setup
+    label: Presale set up
+    start: presale-kickoff
+    end: vip-start
+    duration_days: [14, 17]
+    basis: The 10/9 kickoff deck gives about 2 weeks, and Elise Budowanec's follow-up the same day launches campaigns 10/26, 17 days after the call
+
+  - key: presale-vip-booking
+    label: VIP interest list and pre-booking
+    start: vip-start
+    end: presale-launch
+    duration_days: [42, 49]
+    basis: The deck gives about 6 weeks, and the 10/9 call set 12/14 for launch, 49 days after a 10/26 start
+
+  - key: presale-membership-sales
+    label: Founding membership sales
+    start: presale-launch
+    end: soft-open
+    duration_days: [90, 150]
+    basis: The deck and the playbook give 3 to 5 months. Soft open comes from the build chain, so this phase checks it and does not derive it
+
 milestones:
-  - key: kickoff-call
+  - key: presale-kickoff
     label: Presale kickoff call
     gantt_row: 34
     input: true
@@ -99,19 +127,17 @@ milestones:
     offset_days: [112, 112]
     basis: Template opens 16 weeks after construction starts, 3/10 against 11/18, which matches the Junction model's July 2027
 
-  - key: presale-launch
-    label: Presale launch
-    gantt_row:
-    anchor: soft-open
-    offset_days: [-150, -90]
-    basis: The playbook puts launch three to five months before opening
-
   - key: vip-start
-    label: VIP lead phase starts
+    label: Pre-booking starts, VIP list opens
     gantt_row: 38
-    anchor: presale-launch
-    offset_days: [-42, -42]
-    basis: About six weeks before launch
+    from_phase: presale-setup
+    basis: Presale kickoff plus the set up phase of 14 to 17 days
+
+  - key: presale-launch
+    label: Membership sales start, presale launch
+    gantt_row: 43
+    from_phase: presale-vip-booking
+    basis: VIP start plus the pre-booking phase of 42 to 49 days
 
   - key: grand-opening
     label: Grand opening

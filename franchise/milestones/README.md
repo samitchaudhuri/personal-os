@@ -4,7 +4,9 @@ Computes a site's milestone dates from one offsets file, so the Junction milesto
 
 ## Files
 
-`offsets.yaml` holds one row per milestone. A milestone is an input that a site supplies, or sits an offset range in days from another milestone. The forward chain runs from landlord delivery through buildout and inspection to soft open, the backward chain runs from soft open to presale launch and the VIP phase, and the GM chain runs forward from the sourcing date a site supplies. Keys are stable names that vault goals and targets link to.
+`offsets.yaml` holds one row per milestone, plus the three presale phases. A milestone is an input that a site supplies, or sits an offset range in days from another milestone, or sits a phase duration after the milestone that starts the phase. The build chain runs from landlord delivery through buildout and inspection to soft open, the presale chain runs forward from `presale-kickoff` through `presale-setup` to `vip-start` and through `presale-vip-booking` to `presale-launch`, and the GM chain runs forward from the sourcing date a site supplies. Keys are stable names that vault goals and targets link to.
+
+A phase is the span between two milestones with a planned duration range in days: `presale-setup` from `presale-kickoff` to `vip-start`, `presale-vip-booking` from `vip-start` to `presale-launch`, and `presale-membership-sales` from `presale-launch` to `soft-open`. The first two derive their end milestone. The third checks `soft-open`, which comes from the build chain, and flags it when the gap from `presale-launch` falls outside 90 to 150 days. A site can pin a date for a derived milestone in `sites.yaml`, and the generator flags the phase if the pinned date puts it outside its range.
 
 `sites.yaml` holds each site's inputs, such as the lease signing target and the soft-open date, plus the contract limits the generator flags against. The contract dates are copied from the vault's Contract dates table and are not derived.
 
@@ -24,7 +26,7 @@ cd franchise/milestones && ./.venv/bin/python timeline_csv.py --site junction --
 
 For TeamGantt, add `--teamgantt` to write its work-breakdown layout, with WBS numbers as predecessors. Its free plan holds 40 tasks and the workbook has 41, so `--skip 13` drops the optional DBA row; the script warns when the count exceeds 40.
 
-Flags go to stderr: a lease date after the Site Acquisition Deadline, a soft open past the Opening Deadline with the extension fee, a GM date after the hard stop before the owner's absence, and any milestone wholly inside that absence.
+Flags go to stderr: a phase whose actual span is outside its planned range, a lease date after the Site Acquisition Deadline, a soft open past the Opening Deadline with the extension fee, a GM date after the hard stop before the owner's absence, and any milestone wholly inside that absence.
 
 ## Tests
 

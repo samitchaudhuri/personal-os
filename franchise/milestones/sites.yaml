@@ -8,7 +8,7 @@ sites:
   junction:
     title: Junction
     inputs:
-      kickoff-call: 2026-10-09      # scheduled by Elise, 11:30 AM PT
+      presale-kickoff: 2026-10-09      # scheduled by Elise, 11:30 AM PT
       gm-sourcing: 2026-10-06       # Fibr's clock start, per Regan Hahn on the 10/7 call
       lease-signed: [2026-11-30, 2026-12-15] # draft about 10/15 plus Anson's 45 to 60 days; Lynnsee's 6-week average falls just before
       landlord-delivery: 2027-04-01 # tentative, April 2027 per Greg on 8/27

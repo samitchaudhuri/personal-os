@@ -27,7 +27,7 @@ class TestResolve(unittest.TestCase):
     def test_inputs_pass_through(self):
         r = junction()
         self.assertEqual(r["lease-signed"], (D(2026, 11, 30), D(2026, 12, 15)))
-        self.assertEqual(r["kickoff-call"], (D(2026, 10, 9), D(2026, 10, 9)))
+        self.assertEqual(r["presale-kickoff"], (D(2026, 10, 9), D(2026, 10, 9)))
 
     def test_sourcing_is_a_site_input(self):
         self.assertEqual(junction()["gm-sourcing"], (D(2026, 10, 6), D(2026, 10, 6)))
@@ -64,11 +64,30 @@ class TestResolve(unittest.TestCase):
     def test_permits_submitted_within_60_days_of_lease(self):
         self.assertEqual(junction()["permits-submitted"], (D(2026, 11, 30), D(2027, 2, 13)))
 
-    def test_backward_chain_from_soft_open(self):
+    def test_forward_chain_from_presale_kickoff(self):
         r = junction()
-        self.assertEqual(r["presale-launch"], (D(2027, 2, 22), D(2027, 4, 23)))
-        self.assertEqual(r["vip-start"], (D(2027, 1, 11), D(2027, 3, 12)))
+        self.assertEqual(r["vip-start"], (D(2026, 10, 23), D(2026, 10, 26)))
+        self.assertEqual(r["presale-launch"], (D(2026, 12, 4), D(2026, 12, 14)))
         self.assertEqual(r["grand-opening"], (D(2027, 9, 2), D(2027, 9, 16)))
+
+    def test_kickoff_slip_moves_vip_and_launch(self):
+        inputs = dict(JUNCTION["inputs"], **{"presale-kickoff": D(2026, 10, 14)})
+        r = ms.resolve(OFFSETS, inputs)
+        self.assertEqual(r["vip-start"][0], D(2026, 10, 28))
+        self.assertEqual(r["presale-launch"][0], D(2026, 12, 9))
+
+    def test_soft_open_does_not_move_presale_launch(self):
+        inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 5, 1)})
+        self.assertEqual(ms.resolve(OFFSETS, inputs)["presale-launch"], junction()["presale-launch"])
+
+    def test_pinned_date_overrides_the_phase(self):
+        inputs = dict(JUNCTION["inputs"], **{"presale-launch": D(2026, 12, 14)})
+        r = ms.resolve(OFFSETS, inputs)
+        self.assertEqual(r["presale-launch"], (D(2026, 12, 14), D(2026, 12, 14)))
+
+    def test_input_for_a_plain_offset_row_is_ignored(self):
+        inputs = dict(JUNCTION["inputs"], **{"soft-open": D(2027, 1, 1)})
+        self.assertEqual(ms.resolve(OFFSETS, inputs)["soft-open"], junction()["soft-open"])
 
     def test_delivery_slip_moves_soft_open(self):
         inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 5, 1)})
@@ -128,6 +147,43 @@ class TestFlags(unittest.TestCase):
     def test_absence_flag_needs_whole_range_inside(self):
         r = dict(junction(), **{"gm-in-seat": (D(2026, 12, 20), D(2026, 12, 22))})
         self.assertIn("absence", self.messages(r)["gm-in-seat"])
+
+
+class TestPhaseFlags(unittest.TestCase):
+    def messages(self, inputs=None):
+        r = ms.resolve(OFFSETS, dict(JUNCTION["inputs"], **(inputs or {})))
+        return dict(ms.phase_flags(OFFSETS, r)), r
+
+    def test_junction_soft_open_is_too_long_after_launch(self):
+        m, _ = self.messages()
+        self.assertIn("presale-membership-sales", m["soft-open"])
+        self.assertIn("at least 70 days over", m["soft-open"])
+
+    def test_derived_phases_are_clean(self):
+        m, _ = self.messages()
+        self.assertNotIn("vip-start", m)
+        self.assertNotIn("presale-launch", m)
+
+    def test_soft_open_inside_the_bound_is_clean(self):
+        # Delivery 12/14 gives soft open 4/5, 112 to 122 days after the launch range.
+        m, _ = self.messages({"landlord-delivery": D(2026, 12, 14)})
+        self.assertNotIn("soft-open", m)
+
+    def test_soft_open_too_soon_after_launch(self):
+        m, _ = self.messages({"presale-launch": D(2027, 6, 1)})
+        self.assertIn("under its planned", m["soft-open"])
+
+    def test_pinned_launch_outside_the_range_is_flagged(self):
+        m, _ = self.messages({"presale-launch": D(2027, 1, 20)})
+        self.assertIn("presale-vip-booking", m["presale-launch"])
+        self.assertIn("over its planned", m["presale-launch"])
+
+    def test_phase_table_lists_every_phase(self):
+        _, r = self.messages()
+        table = ms.render_phases(OFFSETS, r)
+        for p in OFFSETS["phases"]:
+            self.assertIn(f"`{p['key']}`", table)
+        self.assertIn("220 to 230 days", table)
 
 
 class TestRender(unittest.TestCase):
