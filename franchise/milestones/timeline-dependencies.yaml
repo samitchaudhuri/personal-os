@@ -1,0 +1,42 @@
+# Proposed finish-to-start dependencies between rows of the opening timeline
+# workbook, keyed by Gantt row. These are proposals for the CSV export, not
+# franchisor rules. `after` lists predecessor rows, and `why` gives the reason
+# in a few words. A row with no entry has no predecessor.
+dependencies:
+  8:  {after: [7],  why: Morrow Hill is engaged after the franchise agreement is signed}
+  9:  {after: [7],  why: Training follows the signing}
+  10: {after: [7],  why: The entity is formed after signing}
+  11: {after: [10], why: The EIN needs the entity}
+  12: {after: [11], why: The bank account needs the EIN}
+  13: {after: [10], why: The DBA registers the entity's trade name}
+  14: {after: [11], why: Licenses need the entity and EIN}
+  15: {after: [7],  why: The model review follows the signing}
+  16: {after: [8, 15], why: The LOI needs Morrow Hill engaged and the model reviewed}
+  17: {after: [12], why: Financing needs the bank account}
+  18: {after: [10], why: The insurer needs the entity}
+  21: {after: [16], why: The lease is negotiated after the LOI}
+  22: {after: [16], why: The architect is hired after the LOI}
+  23: {after: [22], why: GC bids need the construction documents}
+  24: {after: [21], why: Signing follows negotiation}
+  25: {after: [24], why: Equipment is ordered after the lease}
+  26: {after: [24, 22], why: Permits are submitted after the lease and the construction documents}
+  27: {after: [26, 23], why: Buildout starts with permits filed and a GC hired}
+  28: {after: [27], why: Lighting and flooring arrive mid-build}
+  29: {after: [27, 25], why: Install needs the build under way and the equipment ordered}
+  30: {after: [28, 29], why: The certificate of occupancy follows the build}
+  34: {after: [16], why: Corporate schedules the kickoff after the LOI executes}
+  35: {after: [34], why: CRM set up follows the kickoff, as in the 10/9 deck}
+  36: {after: [34], why: Payroll provider selection follows the kickoff}
+  37: {after: [34], why: Digital vendor selection follows the kickoff, as in the 10/9 deck}
+  38: {after: [35, 37], why: The VIP campaign needs the CRM and the digital partner}
+  39: {after: [32], why: Hiring and training follow recruiting}
+  40: {after: [34], why: Weekly calls begin after the kickoff}
+  41: {after: [24], why: Signage needs a lease and a site plan}
+  42: {after: [34], why: Grassroots planning follows the kickoff}
+  43: {after: [38, 19], why: Founding sales follow the VIP campaign and the membership contract review}
+  44: {after: [34], why: Advisor recruiting follows the kickoff}
+  45: {after: [44], why: Hiring follows recruiting}
+  46: {after: [29, 39, 45], why: Staff train on installed equipment once the GM and advisors are hired}
+  47: {after: [30, 46], why: Soft opening follows the certificate of occupancy and staff training}
+  48: {after: [47], why: Closeout follows the soft opening}
+  49: {after: [47], why: Opening day follows the soft opening}
