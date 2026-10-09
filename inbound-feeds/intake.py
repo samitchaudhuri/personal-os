@@ -137,6 +137,7 @@ class ParsedMessage:
     attachment_names: list[str] = field(default_factory=list)
     thread_excerpt: str = ""
     owner_in_thread: bool = False
+    internal_ms: int = 0
 
 
 @dataclass
@@ -420,6 +421,13 @@ def _walk_parts(payload: Mapping[str, Any]) -> Iterable[Mapping[str, Any]]:
             yield from _walk_parts(part)
 
 
+def _internal_ms(resource: Mapping[str, Any]) -> int:
+    try:
+        return int(resource.get("internalDate") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def parse_gmail_resource(
     resource: Mapping[str, Any], thread_excerpt: str = ""
 ) -> ParsedMessage:
@@ -459,6 +467,7 @@ def parse_gmail_resource(
         headers={k.lower(): v for k, v in headers.items()},
         attachment_names=attachments,
         thread_excerpt=thread_excerpt,
+        internal_ms=_internal_ms(resource),
     )
 
 
@@ -912,6 +921,128 @@ def print_counts(
         print(f"no keep/borderline; left {dest} unchanged")
 
 
+def parse_since(value: str) -> datetime:
+    """Parse an ISO timestamp; a value with no offset is local time."""
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.astimezone()
+    return parsed
+
+
+def scoped_query(query: str | None, since: datetime | None) -> str:
+    parts: list[str] = []
+    if since is not None:
+        parts.append(f"after:{int(since.timestamp())}")
+    if query:
+        parts.append(query)
+    return " ".join(parts)
+
+
+def scoped_path(out_dir: Path, source: str, pulled: datetime) -> Path:
+    stamp = pulled.strftime("%Y-%m-%dT%H%M%S")
+    return out_dir / f"Thread Pull {loop.source_label(source)} {stamp}.md"
+
+
+def assert_scoped_out_allowed(out_dir: Path, vault_root: Path) -> None:
+    resolved = out_dir.resolve()
+    for folder in (intake_dir(vault_root), *(vault_root / f for f in FIVE_MANAGEMENT_FOLDERS)):
+        try:
+            resolved.relative_to(folder.resolve())
+        except ValueError:
+            continue
+        raise ValueError(f"scoped pull output must not go under {folder}")
+
+
+def newest_message_time(messages: Iterable[ParsedMessage]) -> datetime | None:
+    stamps = [m.internal_ms for m in messages if m.internal_ms]
+    if not stamps:
+        return None
+    return datetime.fromtimestamp(max(stamps) / 1000).astimezone()
+
+
+def run_scoped(args: argparse.Namespace, vault_root: Path) -> int:
+    """Read-only pull for Thread Intake.
+
+    Fetches messages matching --query and/or newer than --since, applies the
+    same Intake Rules filter, and writes the survivors to --out. It does not
+    chunk by day, skip ids already in a batch file, touch the Intake Ledger,
+    or write under Management/Intake/.
+    """
+    source = args.source
+    if args.out is None:
+        print("--query and --since need --out DIR (outside the vault).", file=sys.stderr)
+        return 2
+    try:
+        since = parse_since(args.since) if args.since else None
+        assert_scoped_out_allowed(args.out, vault_root)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    try:
+        creds = load_token_credentials(source, args.config_dir)
+    except FileNotFoundError as exc:
+        print(str(exc), file=sys.stderr)
+        return 2
+    except Exception as exc:
+        print(
+            f"Token refresh failed: {exc}. "
+            f"Run ./oauth_loop.py --source {source} --force",
+            file=sys.stderr,
+        )
+        return 1
+    session = loop.authorized_session(creds)
+    query = scoped_query(args.query, since)
+    try:
+        messages, _ = pull_messages(
+            session, query, source, set(), message_pause=args.message_pause_seconds
+        )
+    except AuthError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    if since is not None:
+        since_ms = since.timestamp() * 1000
+        messages = [m for m in messages if m.internal_ms > since_ms]
+    contacts = load_contacts(vault_root)
+    domains = vendor_domains(contacts, source)
+    counts = RunCounts(pulled=len(messages))
+    sections: list[str] = []
+    kept: list[ParsedMessage] = []
+    for message in messages:
+        classification = classify(message, contacts, source=source, known_domains=domains)
+        if classification.ingress == INGRESS_DROP:
+            counts.drop += 1
+            continue
+        if classification.ingress == INGRESS_KEEP:
+            counts.keep += 1
+        else:
+            counts.borderline += 1
+        sections.append(render_section(message, classification))
+        kept.append(message)
+    pulled_at = datetime.now().astimezone()
+    dest = scoped_path(args.out, source, pulled_at)
+    print(f"source: {loop.source_label(source)}")
+    print(f"query: {query}")
+    print(f"pulled: {counts.pulled}")
+    print(f"keep: {counts.keep}")
+    print(f"borderline: {counts.borderline}")
+    print(f"drop: {counts.drop}")
+    newest = newest_message_time(kept)
+    if newest is not None:
+        print(f"newest message: {newest.isoformat(timespec='seconds')}")
+    if not sections:
+        print("nothing to write")
+        return 0
+    if args.dry_run:
+        print(f"dry-run, would write: {dest}")
+        return 0
+    args.out.mkdir(parents=True, exist_ok=True)
+    dest.write_text(
+        render_frontmatter(pulled_at, source) + "\n" + "\n".join(sections).rstrip() + "\n"
+    )
+    print(f"wrote: {dest}")
+    return 0
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -942,6 +1073,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         type=Path,
         default=None,
         help=argparse.SUPPRESS,
+    )
+    parser.add_argument(
+        "--query",
+        default=None,
+        help=(
+            "Scoped pull for Thread Intake: a Gmail search string such as "
+            "'from:marsh newer_than:3d'. Needs --out; skips the day chunks, "
+            "the ledger and Management/Intake/."
+        ),
+    )
+    parser.add_argument(
+        "--since",
+        default=None,
+        help=(
+            "Scoped pull: only messages newer than this ISO timestamp "
+            "(no offset means local time). Needs --out."
+        ),
+    )
+    parser.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help="Scoped pull: directory for the output file; must be outside the vault's Intake and brain folders.",
     )
     parser.add_argument(
         "--window-days",
@@ -978,6 +1132,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
     vault_root = args.vault if args.vault is not None else default_vault_root()
     source = args.source
+    if args.query or args.since:
+        return run_scoped(args, vault_root)
     today = date.today()
     after = after_date(load_ledger_date(ledger_path(vault_root)), today)
     try:

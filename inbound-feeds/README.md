@@ -92,6 +92,17 @@ Once Pull fetches the messages for a day chunk, Filter and Store finish writing 
 
 The Examples below show both a run that hits the limit and stops, and the same mailbox passing once pacing is in place.
 
+## Scoped pull for Thread Intake
+
+Thread Intake reads a few threads during the day, so it uses a read-only pull instead of the Friday batch. Passing `--query`, `--since` or both switches `intake.py` into that mode.
+
+```bash
+./.venv/bin/python intake.py --source ulc_gmail --since 2026-10-08T12:02 --out "$SCRATCH"
+./.venv/bin/python intake.py --source ulc_gmail --query 'from:marshmma.com newer_than:7d' --out "$SCRATCH"
+```
+
+`--query` is a Gmail search string. `--since` is an ISO timestamp, local time when it has no offset, and the pull keeps only messages that arrived after it, so passing the ledger's `last_thread_at` does not return the message it came from. `--out` is required and must be outside `Management/Intake/` and the five brain folders, because the run refuses to write there. The scoped pull skips the day chunks and the id check against batch files, never reads or moves the Intake Ledger, and writes one `Thread Pull <source> <timestamp>.md` file with the same section format as a batch file. It applies the same Intake Rules filter, so marketing and receipts drop out. The run prints the counts and the time of the newest kept message, which Thread Intake stores as `last_thread_at`. A run that finds nothing writes no file. `--dry-run` prints the counts without writing.
+
 ## Examples
 
 The first example uses `gmail-account1` to illustrate the effect of the mechanism that reduces API volume. For one chunk, `messages.list` returns 66 ids for that day; 29 are already stored, so Pull fetches only the remaining 37. That cuts the chunk's Gmail calls from a possible 133 (1 + 66 × 2) to 75 (1 + 37 × 2), and the fraction skipped grows on every later run as more of the window is already on file.

@@ -802,3 +802,140 @@ class TestCli(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestScopedPull(unittest.TestCase):
+    SINCE = "2026-10-08T12:00:00-07:00"
+
+    def _ms(self, iso):
+        return int(datetime.fromisoformat(iso).timestamp() * 1000)
+
+    def _run(self, vault, out, messages, extra=None):
+        argv = ["--vault", str(vault), "--out", str(out)] + (extra or [])
+        with patch.object(intake, "pull_messages", return_value=(messages, 0)) as pull:
+            with patch.object(intake, "load_token_credentials", return_value=object()):
+                with patch.object(loop, "authorized_session", return_value=Mock()):
+                    with patch("sys.stdout", StringIO()) as out_io:
+                        code = intake.main(argv)
+        return code, pull, out_io.getvalue()
+
+    def _vault(self, tmp):
+        vault = Path(tmp) / "vault"
+        shutil.copytree(FIXTURE_VAULT, vault)
+        return vault
+
+    def test_scoped_query_combines_since_epoch_and_query(self):
+        since = intake.parse_since(self.SINCE)
+        self.assertEqual(
+            intake.scoped_query("from:marsh", since),
+            f"after:{int(since.timestamp())} from:marsh",
+        )
+        self.assertEqual(intake.scoped_query("from:marsh", None), "from:marsh")
+        self.assertEqual(intake.scoped_query(None, since), f"after:{int(since.timestamp())}")
+
+    def test_since_without_offset_is_local_time(self):
+        self.assertIsNotNone(intake.parse_since("2026-10-08T12:00").tzinfo)
+
+    def test_internal_date_is_parsed_and_bad_values_become_zero(self):
+        self.assertEqual(intake._internal_ms({"internalDate": "1790000000000"}), 1790000000000)
+        self.assertEqual(intake._internal_ms({"internalDate": "x"}), 0)
+        self.assertEqual(intake._internal_ms({}), 0)
+
+    def test_writes_outside_the_vault_and_leaves_vault_alone(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            vault = self._vault(tmp)
+            out = Path(tmp) / "scratch"
+            before = sorted(p.name for p in (vault / "Management/Intake").iterdir())
+            msg = _msg(
+                gmail_id="s1",
+                from_header="Don Michael <don@ultimatelongevitycenters.com>",
+                internal_ms=self._ms("2026-10-08T13:00:00-07:00"),
+            )
+            code, pull, text = self._run(
+                vault, out, [msg], ["--since", self.SINCE, "--query", "from:don"]
+            )
+            self.assertEqual(code, 0)
+            written = list(out.glob("Thread Pull *.md"))
+            self.assertEqual(len(written), 1)
+            self.assertIn("gmail_id: s1", written[0].read_text())
+            expected = intake.newest_message_time([msg]).isoformat(timespec="seconds")
+            self.assertIn(f"newest message: {expected}", text)
+            after = sorted(p.name for p in (vault / "Management/Intake").iterdir())
+            self.assertEqual(before, after)
+            self.assertIn("from:don", pull.call_args.args[1])
+            self.assertEqual(pull.call_args.args[3], set())
+
+    def test_messages_at_or_before_since_are_dropped(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            vault = self._vault(tmp)
+            out = Path(tmp) / "scratch"
+            old = _msg(
+                gmail_id="old",
+                from_header="Don Michael <don@ultimatelongevitycenters.com>",
+                internal_ms=self._ms(self.SINCE),
+            )
+            code, _, text = self._run(vault, out, [old], ["--since", self.SINCE])
+            self.assertEqual(code, 0)
+            self.assertIn("pulled: 0", text)
+            self.assertIn("nothing to write", text)
+            self.assertFalse(out.exists())
+
+    def test_dry_run_writes_nothing(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            vault = self._vault(tmp)
+            out = Path(tmp) / "scratch"
+            msg = _msg(
+                gmail_id="s2",
+                from_header="Don Michael <don@ultimatelongevitycenters.com>",
+                internal_ms=self._ms("2026-10-08T13:00:00-07:00"),
+            )
+            code, _, text = self._run(vault, out, [msg], ["--query", "x", "--dry-run"])
+            self.assertEqual(code, 0)
+            self.assertIn("dry-run", text)
+            self.assertFalse(out.exists())
+
+    def test_out_is_required(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            vault = self._vault(tmp)
+            with patch("sys.stderr", StringIO()) as err:
+                with patch.object(intake, "pull_messages") as pull:
+                    code = intake.main(["--vault", str(vault), "--query", "x"])
+            self.assertEqual(code, 2)
+            self.assertIn("--out", err.getvalue())
+            pull.assert_not_called()
+
+    def test_out_under_intake_or_brain_folders_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            vault = self._vault(tmp)
+            for rel in ("Management/Intake", "Management/Team/sub"):
+                with self.subTest(rel=rel):
+                    with patch("sys.stderr", StringIO()) as err:
+                        with patch.object(intake, "pull_messages") as pull:
+                            code = intake.main(
+                                ["--vault", str(vault), "--query", "x", "--out", str(vault / rel)]
+                            )
+                    self.assertEqual(code, 2)
+                    self.assertIn("must not go under", err.getvalue())
+                    pull.assert_not_called()
+
+    def test_auth_error_exits_1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            vault = self._vault(tmp)
+            with patch.object(intake, "load_token_credentials", return_value=object()):
+                with patch.object(loop, "authorized_session", return_value=Mock()):
+                    with patch.object(intake, "pull_messages", side_effect=intake.AuthError("boom")):
+                        with patch("sys.stderr", StringIO()) as err:
+                            code = intake.main(
+                                ["--vault", str(vault), "--query", "x", "--out", str(Path(tmp) / "o")]
+                            )
+            self.assertEqual(code, 1)
+            self.assertIn("boom", err.getvalue())
+
+    def test_ledger_date_is_not_read_or_advanced(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            vault = self._vault(tmp)
+            ledger = vault / "Management/Intake/Intake Ledger.md"
+            before = ledger.read_text() if ledger.exists() else None
+            self._run(vault, Path(tmp) / "scratch", [], ["--query", "x"])
+            after = ledger.read_text() if ledger.exists() else None
+            self.assertEqual(before, after)
