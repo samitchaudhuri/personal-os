@@ -23,10 +23,21 @@ def junction():
     return ms.resolve(OFFSETS, JUNCTION["inputs"])
 
 
+def synthetic(constraints, events, **fixed):
+    """Offsets with the named events; `fixed` marks which are inputs."""
+    return {"milestones": [dict(key=e, label=e, basis="", **({"input": True} if e in fixed else {}))
+                           for e in events],
+            "constraints": constraints}
+
+
+def c(frm, to, lo, hi, kind="estimate"):
+    return {"from": frm, "to": to, "days": [lo, hi], "kind": kind}
+
+
 class TestResolve(unittest.TestCase):
     def test_inputs_pass_through(self):
         r = junction()
-        self.assertEqual(r["lease-signed"], (D(2026, 11, 30), D(2026, 12, 15)))
+        self.assertEqual(r["lease-signed"], (D(2026, 11, 30), D(2026, 12, 14)))
         self.assertEqual(r["presale-kickoff"], (D(2026, 10, 9), D(2026, 10, 9)))
 
     def test_sourcing_is_a_site_input(self):
@@ -40,52 +51,85 @@ class TestResolve(unittest.TestCase):
 
     def test_forward_chain_uses_template_durations(self):
         r = junction()
-        pt = lambda y, m, d: (D(y, m, d), D(y, m, d))
-        self.assertEqual(r["construction-start"], pt(2027, 4, 1))
-        self.assertEqual(r["lighting-flooring"], pt(2027, 5, 13))
-        self.assertEqual(r["equipment-delivered"], pt(2027, 7, 1))
-        self.assertEqual(r["equipment-ordered"], pt(2027, 4, 8))
-        self.assertEqual(r["build-complete"], pt(2027, 7, 15))
-        self.assertEqual(r["soft-open"], pt(2027, 7, 22))
+        rg = lambda a, b: (D(*a), D(*b))
+        self.assertEqual(r["construction-start"], rg((2027, 2, 8), (2027, 2, 18)))
+        self.assertEqual(r["lighting-flooring"], rg((2027, 3, 22), (2027, 4, 1)))
+        self.assertEqual(r["equipment-delivered"], rg((2027, 5, 10), (2027, 5, 20)))
+        self.assertEqual(r["equipment-ordered"], rg((2027, 2, 15), (2027, 2, 25)))
+        self.assertEqual(r["build-complete"], rg((2027, 5, 24), (2027, 6, 3)))
+        self.assertEqual(r["soft-open"], rg((2027, 5, 31), (2027, 6, 10)))
+
+    def test_permit_review_follows_submission(self):
+        r = junction()
+        self.assertEqual(r["permits-submitted"], (D(2026, 12, 14), D(2026, 12, 14)))
+        self.assertEqual(r["permits-received"], (D(2027, 1, 29), D(2027, 2, 8)))
+
+    def test_delivery_is_the_planning_assumption(self):
+        self.assertEqual(junction()["landlord-delivery"], (D(2027, 2, 8), D(2027, 2, 8)))
+
+    def test_delivery_is_an_input_every_site_must_give(self):
+        inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "landlord-delivery"}
+        with self.assertRaises(ValueError):
+            ms.resolve(OFFSETS, inputs)
+
+    def test_earlier_delivery_changes_nothing_and_later_delivery_moves_the_build(self):
+        early = ms.resolve(OFFSETS, dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 1, 15)}))
+        self.assertEqual(early["construction-start"], junction()["construction-start"])
+        self.assertEqual(early["soft-open"], junction()["soft-open"])
+        late = ms.resolve(OFFSETS, dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 2, 12)}))
+        self.assertEqual(late["construction-start"], (D(2027, 2, 12), D(2027, 2, 18)))
+
+    def test_construction_waits_for_the_later_of_delivery_and_permits(self):
+        late = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 3, 1)})
+        self.assertEqual(ms.resolve(OFFSETS, late)["construction-start"], (D(2027, 3, 1), D(2027, 3, 1)))
+        self.assertEqual(junction()["construction-start"][0], D(2027, 2, 8))
 
     def test_template_gaps_from_construction_start(self):
         # Template: construction 11/18, lighting 12/30, install 2/17, CO week of 3/3, open 3/10.
         start = D(2026, 11, 18)
-        inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": start})
+        inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": start,
+                                             "permits-received": D(2026, 10, 1)})
         r = ms.resolve(OFFSETS, inputs)
         self.assertEqual(r["lighting-flooring"][0], D(2026, 12, 30))
         self.assertEqual(r["equipment-delivered"][0], D(2027, 2, 17))
         self.assertEqual(r["build-complete"][0], D(2027, 3, 3))
         self.assertEqual(r["soft-open"][0], D(2027, 3, 10))
 
-    def test_rent_starts_150_days_after_delivery(self):
-        self.assertEqual(junction()["rent-commences"], (D(2027, 8, 29), D(2027, 8, 29)))
+    def test_rent_starts_150_days_after_the_later_not_before_rule(self):
+        # Delivery 2/8 plus 150 days is 7/8, later than the earliest permits plus 150 days, 6/28.
+        self.assertEqual(junction()["rent-commences"], (D(2027, 7, 8), D(2027, 7, 8)))
 
     def test_permits_submitted_within_60_days_of_lease(self):
-        self.assertEqual(junction()["permits-submitted"], (D(2026, 11, 30), D(2027, 2, 13)))
+        inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "permits-submitted"}
+        # 60 days after the latest lease is 2/13, but soft open must stay within 180 days of the
+        # latest launch, and that pulls the latest submission back to 1/2.
+        self.assertEqual(ms.resolve(OFFSETS, inputs)["permits-submitted"], (D(2026, 11, 30), D(2027, 1, 2)))
+
+    def test_site_fixed_submission_narrows_the_lease_backward(self):
+        # Submission fixed on 12/14 within 0 to 60 days of the lease means the lease is signed by 12/14.
+        self.assertEqual(junction()["lease-signed"][1], D(2026, 12, 14))
 
     def test_forward_chain_from_presale_kickoff(self):
         r = junction()
         self.assertEqual(r["vip-start"], (D(2026, 10, 23), D(2026, 10, 26)))
-        self.assertEqual(r["presale-launch"], (D(2026, 12, 4), D(2026, 12, 14)))
-        self.assertEqual(r["grand-opening"], (D(2027, 9, 2), D(2027, 9, 16)))
+        self.assertEqual(r["presale-launch"], (D(2026, 12, 4), D(2026, 12, 21)))
+        self.assertEqual(r["grand-opening"], (D(2027, 7, 12), D(2027, 8, 5)))
 
-    def test_kickoff_slip_moves_vip_and_launch(self):
+    def test_kickoff_slip_moves_vip_and_launch_and_the_gm_requirement_pulls_them_later(self):
+        # Kickoff 10/14 gives VIP 10/28 to 10/31 and launch 12/09 to 12/26 from the durations alone.
+        # Launch can only be met by the GM at 12/25 or later, so the requirement trims both ranges.
         inputs = dict(JUNCTION["inputs"], **{"presale-kickoff": D(2026, 10, 14)})
-        r = ms.resolve(OFFSETS, inputs)
-        self.assertEqual(r["vip-start"][0], D(2026, 10, 28))
-        self.assertEqual(r["presale-launch"][0], D(2026, 12, 9))
+        s = ms.solve(OFFSETS, inputs)
+        self.assertEqual(s.ranges["vip-start"], (D(2026, 10, 30), D(2026, 10, 31)))
+        self.assertEqual(s.ranges["presale-launch"], (D(2026, 12, 25), D(2026, 12, 26)))
+        self.assertEqual(s.conflicts, [])
 
-    def test_soft_open_does_not_move_presale_launch(self):
-        inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 5, 1)})
-        self.assertEqual(ms.resolve(OFFSETS, inputs)["presale-launch"], junction()["presale-launch"])
-
-    def test_pinned_date_overrides_the_phase(self):
+    def test_site_fixed_date_replaces_the_estimates(self):
         inputs = dict(JUNCTION["inputs"], **{"presale-launch": D(2026, 12, 14)})
         r = ms.resolve(OFFSETS, inputs)
         self.assertEqual(r["presale-launch"], (D(2026, 12, 14), D(2026, 12, 14)))
 
-    def test_input_for_a_plain_offset_row_is_ignored(self):
+    def test_input_for_a_computed_row_is_ignored(self):
         inputs = dict(JUNCTION["inputs"], **{"soft-open": D(2027, 1, 1)})
         self.assertEqual(ms.resolve(OFFSETS, inputs)["soft-open"], junction()["soft-open"])
 
@@ -98,16 +142,100 @@ class TestResolve(unittest.TestCase):
         self.assertEqual(ms.resolve(OFFSETS, inputs)["gm-in-seat"][0], D(2026, 12, 10))
 
     def test_missing_input_is_an_error(self):
-        inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "landlord-delivery"}
+        inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "presale-kickoff"}
         with self.assertRaises(ValueError):
             ms.resolve(OFFSETS, inputs)
 
-    def test_cycle_is_an_error(self):
-        looped = {"milestones": [
-            {"key": "a", "anchor": "b", "offset_days": [0, 0]},
-            {"key": "b", "anchor": "a", "offset_days": [0, 0]}]}
+    def test_unbounded_event_is_an_error(self):
+        lone = synthetic([c("a", "b", 1, 2)], ["a", "b", "orphan"], a=1)
         with self.assertRaises(ValueError):
-            ms.resolve(looped, {})
+            ms.resolve(lone, {"a": D(2026, 1, 1)})
+
+    def test_unknown_kind_is_an_error(self):
+        bad = synthetic([c("a", "b", 1, 2, kind="hope")], ["a", "b"], a=1)
+        with self.assertRaises(ValueError):
+            ms.resolve(bad, {"a": D(2026, 1, 1)})
+
+
+class TestConstraintModel(unittest.TestCase):
+    def test_range_is_the_intersection_of_every_constraint(self):
+        # b is 1/11 to 1/21 from a and 1/15 to 1/22 from z, so both fit only from 1/15 to 1/21.
+        off = synthetic([c("a", "b", 10, 20), c("z", "b", 5, 8)], ["a", "z", "b"], a=1, z=1)
+        r = ms.resolve(off, {"a": D(2026, 1, 1), "z": [D(2026, 1, 10), D(2026, 1, 14)]})
+        self.assertEqual(r["b"], (D(2026, 1, 15), D(2026, 1, 21)))
+
+    def test_constraints_narrow_the_earlier_event_backward(self):
+        # b is fixed 1/20 to 1/25 and sits 10 to 15 days after a, so a is 1/5 to 1/15, not 1/1 to 1/31.
+        off = synthetic([c("a", "b", 10, 15)], ["a", "b"], a=1, b=1)
+        r = ms.resolve(off, {"a": [D(2026, 1, 1), D(2026, 1, 31)], "b": [D(2026, 1, 20), D(2026, 1, 25)]})
+        self.assertEqual(r["a"], (D(2026, 1, 5), D(2026, 1, 15)))
+
+    def test_negative_range_puts_the_event_before(self):
+        off = synthetic([c("launch", "gm", -21, -21)], ["launch", "gm"], launch=1)
+        r = ms.resolve(off, {"launch": D(2026, 12, 21)})
+        self.assertEqual(r["gm"], (D(2026, 11, 30), D(2026, 11, 30)))
+
+    def test_gm_requirement_narrows_launch_given_the_gm_and_the_gm_given_launch(self):
+        off = synthetic([c("gm", "launch", 21, 21, "requirement")], ["gm", "launch"], gm=1)
+        self.assertEqual(ms.resolve(off, {"gm": [D(2026, 12, 4), D(2026, 12, 18)]})["launch"],
+                         (D(2026, 12, 25), D(2027, 1, 8)))
+        off = synthetic([c("gm", "launch", 21, 21, "requirement")], ["gm", "launch"], launch=1)
+        self.assertEqual(ms.resolve(off, {"launch": [D(2026, 12, 25), D(2027, 1, 8)]})["gm"],
+                         (D(2026, 12, 4), D(2026, 12, 18)))
+
+    def test_not_before_takes_the_latest_lower_bound_and_starts_as_soon_as_allowed(self):
+        off = synthetic([c("a", "x", 0, None), c("b", "x", 10, None)], ["a", "b", "x"], a=1, b=1)
+        r = ms.resolve(off, {"a": [D(2026, 3, 1), D(2026, 3, 5)], "b": [D(2026, 2, 20), D(2026, 3, 1)]})
+        self.assertEqual(r["x"], (D(2026, 3, 2), D(2026, 3, 11)))
+
+    def test_not_before_alone_leaves_no_upper_limit_so_a_later_bound_conflicts(self):
+        off = synthetic([c("a", "x", 0, None), c("x", "y", 5, 5), c("z", "y", 0, 0)],
+                        ["a", "x", "y", "z"], a=1, z=1)
+        s = ms.solve(off, {"a": D(2026, 3, 1), "z": D(2026, 3, 1)})
+        self.assertEqual(len(s.conflicts), 1)
+
+    def test_junction_gm_requirement_conflicts_with_the_fibr_estimate(self):
+        s = ms.solve(OFFSETS, JUNCTION["inputs"])
+        self.assertEqual(len(s.conflicts), 1)
+        k = s.conflicts[0]
+        self.assertEqual(k.short, 4)
+        self.assertEqual(k.set_aside.name, "gm-in-seat to presale-launch")
+        names = {x.name for x in k.constraints}
+        self.assertIn("gm-in-seat to presale-launch", names)
+        self.assertIn("gm-sourcing to gm-offer-accepted", names)
+        self.assertIn("Requirement gm-in-seat to presale-launch is unmet unless the estimates", k.message)
+        self.assertIn("improve by 4 days in total", k.message)
+        for date in ("2026-12-21", "2026-11-30", "2026-11-16", "2026-11-20"):
+            self.assertIn(date, k.message)
+
+    def test_conflict_shows_the_estimates_without_the_requirement(self):
+        s = ms.solve(OFFSETS, JUNCTION["inputs"])
+        self.assertEqual(s.ranges["presale-launch"], (D(2026, 12, 4), D(2026, 12, 21)))
+        self.assertEqual(s.ranges["gm-in-seat"], (D(2026, 12, 4), D(2026, 12, 18)))
+
+    def test_requirement_met_means_no_conflict(self):
+        inputs = dict(JUNCTION["inputs"], **{"gm-sourcing": D(2026, 10, 2)})
+        self.assertEqual(ms.solve(OFFSETS, inputs).conflicts, [])
+
+    def test_two_estimates_collide_and_the_one_listed_last_gives(self):
+        off = synthetic([c("a", "b", 10, 10), c("a", "b", 20, 20)], ["a", "b"], a=1)
+        s = ms.solve(off, {"a": D(2026, 1, 1)})
+        self.assertEqual(len(s.conflicts), 1)
+        self.assertIn("The estimates a to b and a to b cannot all hold and are 10 days apart", s.conflicts[0].message)
+        self.assertEqual(s.ranges["b"], (D(2026, 1, 11), D(2026, 1, 11)))
+
+    def test_loop_without_dates_names_the_constraints(self):
+        off = synthetic([c("a", "b", 5, 5, "requirement"), c("b", "a", 0, 0)], ["a", "b"])
+        off["milestones"][0]["input"] = True
+        s = ms.solve(off, {"a": D(2026, 1, 1)})
+        self.assertEqual(len(s.conflicts), 1)
+
+    def test_delivery_slip_collides_with_the_sales_window(self):
+        inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 5, 1)})
+        s = ms.solve(OFFSETS, inputs)
+        self.assertIn("presale-membership-sales", [k.set_aside.name for k in s.conflicts])
+        self.assertEqual(s.ranges["presale-launch"], junction()["presale-launch"])
+        self.assertIn("presale-membership-sales", s.set_aside_phases)
 
 
 class TestMonthsOver(unittest.TestCase):
@@ -128,8 +256,8 @@ class TestFlags(unittest.TestCase):
     def test_junction_flags_extension_and_opening_fee(self):
         m = self.messages(junction())
         self.assertIn("one-time 90-day extension", m["lease-signed"])
-        self.assertIn("3 months past", m["soft-open"])
-        self.assertIn("$7,500", m["soft-open"])
+        self.assertIn("1 months past", m["soft-open"])
+        self.assertIn("$2,500", m["soft-open"])
         self.assertIn("hard stop", m["gm-in-seat"])
 
     def test_lease_before_deadline_is_clean(self):
@@ -149,15 +277,80 @@ class TestFlags(unittest.TestCase):
         self.assertIn("absence", self.messages(r)["gm-in-seat"])
 
 
+class TestConflictFlags(unittest.TestCase):
+    def test_flag_names_both_constraints_and_the_days(self):
+        s = ms.solve(OFFSETS, JUNCTION["inputs"])
+        key, msg = s.conflicts[0].key, s.conflicts[0].message
+        self.assertEqual(key, "presale-launch")
+        self.assertIn("gm-in-seat to presale-launch", msg)
+        self.assertIn("gm-sourcing to gm-offer-accepted", msg)
+        self.assertIn("4 days", msg)
+
+
+class TestInputsTable(unittest.TestCase):
+    def rows(self, site=JUNCTION):
+        return ms.render_inputs(OFFSETS, site).splitlines()[2:]
+
+    def test_lists_every_date_the_site_gives_with_its_status(self):
+        rows = self.rows()
+        self.assertEqual(len(rows), len(JUNCTION["inputs"]))
+        by_key = {r.split("`")[1]: r for r in rows}
+        self.assertIn("| 2027-02-08 | assumed |", by_key["landlord-delivery"])
+        self.assertIn("| committed |", by_key["presale-kickoff"])
+        self.assertIn("| 2026-11-30 to 2026-12-15 | estimated |", by_key["lease-signed"])
+
+    def test_rows_follow_milestone_order(self):
+        keys = [r.split("`")[1] for r in self.rows()]
+        order = [m["key"] for m in OFFSETS["milestones"]]
+        self.assertEqual(keys, sorted(keys, key=order.index))
+
+    def test_site_basis_replaces_the_default(self):
+        by_key = {r.split("`")[1]: r for r in self.rows()}
+        self.assertIn("planning assumption", by_key["landlord-delivery"])
+
+    def test_a_date_without_a_status_is_an_error(self):
+        site = dict(JUNCTION, status={k: v for k, v in JUNCTION["status"].items() if k != "landlord-delivery"})
+        with self.assertRaises(ValueError):
+            ms.render_inputs(OFFSETS, site)
+
+    def test_unknown_status_is_an_error(self):
+        site = dict(JUNCTION, status=dict(JUNCTION["status"], **{"lease-signed": "hoped"}))
+        with self.assertRaises(ValueError):
+            ms.render_inputs(OFFSETS, site)
+
+
+class TestSetAsideTable(unittest.TestCase):
+    def test_lists_the_requirement_set_aside_and_what_it_collides_with(self):
+        table = ms.render_set_aside(ms.solve(OFFSETS, JUNCTION["inputs"]).conflicts)
+        row = table.splitlines()[2]
+        self.assertTrue(row.startswith("| `gm-in-seat to presale-launch` | requirement |"))
+        self.assertIn("`gm-sourcing to gm-offer-accepted`", row)
+        self.assertNotIn("`gm-in-seat to presale-launch`", row.split("|")[4])
+        self.assertTrue(row.endswith("| 4 |"))
+
+    def test_rows_follow_the_order_ignored(self):
+        inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 5, 1)})
+        rows = ms.render_set_aside(ms.solve(OFFSETS, inputs).conflicts).splitlines()[2:]
+        self.assertEqual(len(rows), 2)
+        self.assertIn("presale-membership-sales", rows[0])
+
+
 class TestPhaseFlags(unittest.TestCase):
     def messages(self, inputs=None):
-        r = ms.resolve(OFFSETS, dict(JUNCTION["inputs"], **(inputs or {})))
-        return dict(ms.phase_flags(OFFSETS, r)), r
+        s = ms.solve(OFFSETS, dict(JUNCTION["inputs"], **(inputs or {})))
+        return dict(ms.phase_flags(OFFSETS, s.ranges, s.set_aside_phases)), s.ranges
 
-    def test_junction_soft_open_is_too_long_after_launch(self):
+    def test_junction_sales_window_is_inside_four_to_six_months(self):
         m, _ = self.messages()
-        self.assertIn("presale-membership-sales", m["soft-open"])
-        self.assertIn("at least 70 days over", m["soft-open"])
+        self.assertNotIn("soft-open", m)
+
+    def test_soft_open_too_long_after_launch_is_a_conflict_not_a_phase_flag(self):
+        s = ms.solve(OFFSETS, dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 6, 1)}))
+        messages = [k.message for k in s.conflicts if k.set_aside.phase == "presale-membership-sales"]
+        self.assertEqual(len(messages), 1)
+        self.assertIn("improve by 94 days in total", messages[0])
+        self.assertIn("landlord-delivery to construction-start", messages[0])
+        self.assertNotIn("soft-open", dict(ms.phase_flags(OFFSETS, s.ranges, s.set_aside_phases)))
 
     def test_derived_phases_are_clean(self):
         m, _ = self.messages()
@@ -165,15 +358,15 @@ class TestPhaseFlags(unittest.TestCase):
         self.assertNotIn("presale-launch", m)
 
     def test_soft_open_inside_the_bound_is_clean(self):
-        # Delivery 12/14 gives soft open 4/5, 112 to 122 days after the launch range.
-        m, _ = self.messages({"landlord-delivery": D(2026, 12, 14)})
+        # Early permits and delivery 12/14 give soft open 4/16 to 4/26, inside 90 to 150 days.
+        m, _ = self.messages({"permits-submitted": D(2026, 10, 30), "landlord-delivery": D(2026, 12, 14)})
         self.assertNotIn("soft-open", m)
 
-    def test_soft_open_too_soon_after_launch(self):
-        m, _ = self.messages({"presale-launch": D(2027, 6, 1)})
-        self.assertIn("under its planned", m["soft-open"])
+    def test_soft_open_too_soon_after_launch_is_a_conflict(self):
+        s = ms.solve(OFFSETS, dict(JUNCTION["inputs"], **{"presale-launch": D(2027, 6, 1)}))
+        self.assertIn("presale-membership-sales", [k.set_aside.name for k in s.conflicts])
 
-    def test_pinned_launch_outside_the_range_is_flagged(self):
+    def test_site_fixed_launch_outside_the_range_is_flagged(self):
         m, _ = self.messages({"presale-launch": D(2027, 1, 20)})
         self.assertIn("presale-vip-booking", m["presale-launch"])
         self.assertIn("over its planned", m["presale-launch"])
@@ -183,7 +376,8 @@ class TestPhaseFlags(unittest.TestCase):
         table = ms.render_phases(OFFSETS, r)
         for p in OFFSETS["phases"]:
             self.assertIn(f"`{p['key']}`", table)
-        self.assertIn("220 to 230 days", table)
+        self.assertIn("`permit-review`", table)
+        self.assertIn("171 to 178 days", table)
 
 
 class TestRender(unittest.TestCase):

@@ -1,36 +1,80 @@
-# One row per milestone. A milestone is either an input a site supplies in
-# sites.yaml, or sits `offset_days` [earliest, latest] from another milestone
-# (negative means before). Keys are the stable names that goals and targets
-# link to in the vault; never rename one without updating those links.
+# Milestones are dated events. Every duration between two of them is a rule "to
+# minus from is within [lo, hi] days", and the range can be negative, such as -21
+# for three weeks before. Keys are the stable names that goals and targets link to
+# in the vault; never rename one without updating those links.
 # gantt_row is the row in `ULC Center Opening Timeline.xlsx`, blank where the
 # template has no bar.
 #
-# A phase is the span between two milestones with a planned duration in days
-# [shortest, longest]. A milestone with `from_phase` is derived forward from
-# that phase's start plus its duration, unless the site pins a date for it in
-# sites.yaml. The generator flags any phase whose actual span falls outside its
-# planned range, including a phase whose end comes from another chain.
+# Each rule has `from`, `to`, `days` [lo, hi] and a `kind`. An estimate is a
+# forecast of how long something takes, such as Fibr's 45 days. A requirement is
+# a gap somebody needs to hold, such as the GM sitting 3 weeks before launch. A
+# `days` pair with hi null, such as [10, null], is a not-before rule: it sets the
+# earliest date and no latest date. A milestone with not-before rules starts as
+# soon as the latest of them allows, so its latest date is the latest of their
+# latest dates.
+#
+# Each milestone is an input or computed. `input: true` means the site must give
+# the date in sites.yaml. Any other milestone is computed from the rules, and a
+# date in sites.yaml for it is ignored unless the row has `site_can_fix: true`.
+# Then the date the site gives replaces the estimates that compute it, while
+# requirements on it still apply.
+#
+# A milestone's range is the intersection of every rule that reaches it, and the
+# rules narrow both ends. When the rules cannot all hold, the generator flags the
+# collision and names the rules. It sets one rule aside to draw the dates: a
+# requirement if the collision has one, else the estimate listed last, so put the
+# checks last. A not-before rule is never set aside.
+#
+# A phase is a rule with a table row of its own, a key and a basis, and the
+# generator also flags any phase whose actual span falls outside its range.
 phases:
+  - key: permit-review
+    label: City permit review
+    start: permits-submitted
+    end: permits-received
+    duration_days: [46, 56]
+    kind: estimate
+    basis: Vision Track plans 46 days from 12/14 to 1/29, and Jason Park quoted about 8 weeks, 56 days, for the initial review in San Diego, Boston and Miami, which are the national worst cases; the regulatory assessment file due 10/23 gives the Los Gatos estimate
+
   - key: presale-setup
     label: Presale set up
     start: presale-kickoff
     end: vip-start
     duration_days: [14, 17]
+    kind: estimate
     basis: The 10/9 kickoff deck gives about 2 weeks, and Elise Budowanec's follow-up the same day launches campaigns 10/26, 17 days after the call
 
   - key: presale-vip-booking
     label: VIP interest list and pre-booking
     start: vip-start
     end: presale-launch
-    duration_days: [42, 49]
-    basis: The deck gives about 6 weeks, and the 10/9 call set 12/14 for launch, 49 days after a 10/26 start
+    duration_days: [42, 56]
+    kind: estimate
+    basis: Michelle Tomko said on 10/14 that VIP booking runs 6 to 8 weeks, which widens the deck's about 6 weeks, and the 10/9 call set 12/14 for launch, 49 days after a 10/26 start
 
   - key: presale-membership-sales
     label: Founding membership sales
     start: presale-launch
     end: soft-open
-    duration_days: [90, 150]
-    basis: The deck and the playbook give 3 to 5 months. Soft open comes from the build chain, so this phase checks it and does not derive it
+    duration_days: [120, 180]
+    kind: estimate
+    basis: Michelle Tomko said on 10/14 that membership sales run 4 to 6 months, which replaces the deck and the playbook's 3 to 5 months. Soft open mostly comes from the build chain, so this phase bounds it from launch and flags a build that falls outside the window
+
+constraints:
+  - {from: gm-sourcing, to: gm-offer-accepted, days: [45, 45], kind: estimate}
+  - {from: gm-offer-accepted, to: gm-in-seat, days: [14, 28], kind: estimate}
+  - {from: gm-in-seat, to: presale-launch, days: [21, 21], kind: requirement}
+  - {from: lease-signed, to: permits-submitted, days: [0, 60], kind: requirement}
+  - {from: landlord-delivery, to: construction-start, days: [0, null], kind: requirement}
+  - {from: permits-received, to: construction-start, days: [10, null], kind: estimate}
+  - {from: landlord-delivery, to: rent-commences, days: [150, null], kind: requirement}
+  - {from: permits-received, to: rent-commences, days: [150, null], kind: requirement}
+  - {from: construction-start, to: lighting-flooring, days: [42, 42], kind: estimate}
+  - {from: construction-start, to: equipment-delivered, days: [91, 91], kind: estimate}
+  - {from: equipment-delivered, to: equipment-ordered, days: [-84, -84], kind: estimate}
+  - {from: construction-start, to: build-complete, days: [105, 105], kind: estimate}
+  - {from: construction-start, to: soft-open, days: [112, 112], kind: estimate}
+  - {from: soft-open, to: grand-opening, days: [42, 56], kind: estimate}
 
 milestones:
   - key: presale-kickoff
@@ -54,94 +98,79 @@ milestones:
   - key: gm-offer-accepted
     label: GM offer accepted
     gantt_row: 32
-    anchor: gm-sourcing
-    offset_days: [45, 45]
     basis: Regan Hahn at Fibr quoted 45 days from the start of the search to an accepted offer on the 10/7 call, which Samit confirmed, and Michelle's checkpoint for an accepted offer is 10/31
 
   - key: gm-in-seat
     label: GM in seat
     gantt_row: 32
-    anchor: gm-offer-accepted
-    offset_days: [14, 28]
-    basis: Two to four weeks of notice between the accepted offer and the start date, and corporate reviews the GM's goals weekly
+    basis: Two to four weeks of notice between the accepted offer and the start date, and Michelle Tomko requires the GM in seat 3 weeks before presale launch. Corporate reviews the GM's goals weekly
 
   - key: permits-submitted
     label: Permits submitted
     gantt_row: 26
-    anchor: lease-signed
-    offset_days: [0, 60]
-    basis: The Counter LOI gives 60 days after the lease to submit, and permits should be issued before landlord delivery
+    site_can_fix: true
+    basis: The Counter LOI gives 60 days after the lease to submit
+
+  - key: permits-received
+    label: Permits issued
+    gantt_row:
+    site_can_fix: true
+    basis: Permits submitted plus the city review phase of 46 to 56 days
 
   - key: landlord-delivery
     label: Landlord delivers the suite
     gantt_row:
     input: true
-    basis: Greg supplied April 2027 availability on 8/27, not yet a committed date
+    basis: Greg supplied April 2027 availability on 8/27, not yet a committed date, so the site records the date it plans around
 
   - key: construction-start
     label: Buildout starts
     gantt_row: 27
-    anchor: landlord-delivery
-    offset_days: [0, 0]
-    basis: Starts on delivery, with permitting finished before it, as the template starts construction after the lease signs
+    basis: Starts on the later of landlord delivery and 10 days after permits are issued, the gap Vision Track leaves between 1/29 and 2/8
 
   - key: rent-commences
     label: Rent commences
     gantt_row:
-    anchor: landlord-delivery
-    offset_days: [150, 150]
-    basis: The Counter LOI starts rent 150 days after the later of permit receipt and delivery, which is delivery when permits come first
+    basis: The Counter LOI starts rent 150 days after the later of permit receipt and delivery
 
   - key: lighting-flooring
     label: Lighting and flooring delivered
     gantt_row: 28
-    anchor: construction-start
-    offset_days: [42, 42]
     basis: Template puts it six weeks into the build, week of 12/30 against a 11/18 start
 
   - key: equipment-delivered
     label: Equipment, A/V and millwork install starts
     gantt_row: 29
-    anchor: construction-start
-    offset_days: [91, 91]
     basis: Template starts install 13 weeks into the build and finishes it the week of 2/24, to confirm with MMP
 
   - key: equipment-ordered
     label: Equipment ordered
     gantt_row: 25
-    anchor: equipment-delivered
-    offset_days: [-84, -84]
     basis: ULC's estimate for MMP, who takes the date from ULC and starts the draw from it. It is the latest order date for the A/V package's 12-week lead time, and the template orders earlier, before construction starts
 
   - key: build-complete
     label: Certificate of occupancy issued
     gantt_row: 30
-    anchor: construction-start
-    offset_days: [105, 105]
     basis: Template issues it 15 weeks after construction starts, week of 3/3 against a 11/18 start
 
   - key: soft-open
     label: Soft open
     gantt_row: 49
-    anchor: construction-start
-    offset_days: [112, 112]
     basis: Template opens 16 weeks after construction starts, 3/10 against 11/18, which matches the Junction model's July 2027
 
   - key: vip-start
     label: Pre-booking starts, VIP list opens
     gantt_row: 38
-    from_phase: presale-setup
+    site_can_fix: true
     basis: Presale kickoff plus the set up phase of 14 to 17 days
 
   - key: presale-launch
     label: Membership sales start, presale launch
     gantt_row: 43
-    from_phase: presale-vip-booking
-    basis: VIP start plus the pre-booking phase of 42 to 49 days
+    site_can_fix: true
+    basis: VIP start plus the pre-booking phase of 42 to 56 days
 
   - key: grand-opening
     label: Grand opening
     gantt_row:
-    anchor: soft-open
-    offset_days: [42, 56]
     basis: Six to eight weeks after soft open

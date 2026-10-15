@@ -2,8 +2,8 @@
 """Compute a site's milestone dates from offsets.yaml and sites.yaml.
 
 Every milestone is a date range. Inputs come from sites.yaml, and each other
-milestone sits an offset range from one it names, or a phase duration from the
-milestone that starts that phase, so a slip in the lease or kickoff date moves
+milestone sits an offset range from one it names, or from the latest of several
+it names, or a phase duration from the milestone that starts that phase, so a slip in the lease or kickoff date moves
 everything downstream. The table it prints has the same
 columns as the Junction milestones table in `ULC Franchise Project.md`, and
 `--write` rewrites the block between that note's generated-table markers.
@@ -21,6 +21,9 @@ import datetime
 import os
 import re
 import sys
+from collections import namedtuple
+from dataclasses import dataclass
+from typing import Optional
 
 import yaml
 
@@ -42,38 +45,287 @@ def as_range(value):
     return (value, value)
 
 
-def resolve(offsets, inputs):
-    """Return {key: (earliest, latest)} for every milestone in offsets."""
-    rows = {m["key"]: m for m in offsets["milestones"]}
-    phases = {p["key"]: p for p in offsets.get("phases", [])}
-    out = {}
+KINDS = ("estimate", "requirement")
+INF = float("inf")
+REF = "@"  # the reference node; a date is its ordinal day number
 
-    def visit(key, trail=()):
-        if key in out:
-            return out[key]
-        if key in trail:
-            raise ValueError(f"offset cycle through {key!r}")
-        m = rows[key]
+
+@dataclass(frozen=True)
+class Constraint:
+    """`to` minus `from` is within [lo, hi] days; hi None means not before."""
+    frm: str
+    to: str
+    lo: int
+    hi: Optional[int]
+    kind: str
+    name: str
+    order: int
+    phase: Optional[str] = None
+
+    @property
+    def not_before(self):
+        return self.hi is None
+
+
+@dataclass(frozen=True)
+class Edge:
+    """x[dst] <= x[src] + w, from a rule, a fixed date or a start-as-soon-as bound."""
+    src: str
+    dst: str
+    w: float
+    source: object
+    forward: bool = True
+
+
+@dataclass(frozen=True)
+class Fixed:
+    key: str
+
+
+@dataclass(frozen=True)
+class Closure:
+    key: str
+    rule: Constraint
+
+
+@dataclass
+class Conflict:
+    key: str
+    constraints: list
+    short: int
+    set_aside: Constraint
+    message: str
+
+
+Solution = namedtuple("Solution", "ranges conflicts set_aside_phases")
+
+
+def ordinal(d):
+    return d.toordinal()
+
+
+def constraints_of(offsets):
+    """Rules from the `constraints` list, then the phases, in file order."""
+    keys = {m["key"] for m in offsets["milestones"]}
+    out = []
+    rows = [dict(c, name=c.get("name")) for c in offsets.get("constraints", [])]
+    rows += [dict(from_=p["start"], to=p["end"], days=p["duration_days"], kind=p["kind"],
+                  name=p["key"], phase=p["key"]) for p in offsets.get("phases", [])]
+    for i, c in enumerate(rows):
+        frm = c.get("from_") or c["from"]
+        lo, hi = c["days"]
+        if c["kind"] not in KINDS:
+            raise ValueError(f"rule {frm} to {c['to']} has kind {c['kind']!r}, not one of {KINDS}")
+        for k in (frm, c["to"]):
+            if k not in keys:
+                raise ValueError(f"rule names unknown milestone {k!r}")
+        if hi is not None and hi < lo:
+            raise ValueError(f"rule {frm} to {c['to']} has hi below lo")
+        out.append(Constraint(frm, c["to"], lo, hi, c["kind"], c.get("name") or f"{frm} to {c['to']}",
+                              i, c.get("phase")))
+    return out
+
+
+def fixed_ordinals(rows, inputs):
+    """Return {key: (earliest, latest)} for events the site fixes, and the set of keys the site fixed."""
+    fixed, site_fixed = {}, set()
+    for key, m in rows.items():
         if m.get("input"):
             if key not in inputs:
                 raise ValueError(f"site gives no input for {key!r}")
-            out[key] = as_range(inputs[key])
-        elif "from_phase" in m and key in inputs:
-            out[key] = as_range(inputs[key])
+        elif not (m.get("site_can_fix") and key in inputs):
+            continue
         else:
-            if "from_phase" in m:
-                phase = phases[m["from_phase"]]
-                anchor, (lo_off, hi_off) = phase["start"], phase["duration_days"]
-            else:
-                anchor, (lo_off, hi_off) = m["anchor"], m["offset_days"]
-            a_lo, a_hi = visit(anchor, trail + (key,))
-            out[key] = (a_lo + datetime.timedelta(days=lo_off),
-                        a_hi + datetime.timedelta(days=hi_off))
-        return out[key]
+            site_fixed.add(key)
+        lo, hi = as_range(inputs[key])
+        fixed[key] = (ordinal(lo), ordinal(hi))
+    return fixed, site_fixed
 
-    for key in rows:
-        visit(key)
-    return out
+
+def shortest(nodes, edges, start, reverse=False):
+    """Bellman-Ford distances from start; a negative cycle would never settle, callers check first."""
+    dist = {n: INF for n in nodes}
+    dist[start] = 0
+    for _ in range(len(nodes)):
+        changed = False
+        for e in edges:
+            s, d = (e.dst, e.src) if reverse else (e.src, e.dst)
+            if dist[s] + e.w < dist[d]:
+                dist[d] = dist[s] + e.w
+                changed = True
+        if not changed:
+            break
+    return dist
+
+
+def negative_cycle(nodes, edges):
+    """Return the edges of one negative cycle in order, or None."""
+    dist = {n: 0 for n in nodes}
+    pred = {n: None for n in nodes}
+    moved = None
+    for _ in range(len(nodes) + 1):
+        moved = None
+        for e in edges:
+            if dist[e.src] + e.w < dist[e.dst]:
+                dist[e.dst] = dist[e.src] + e.w
+                pred[e.dst] = e
+                moved = e.dst
+        if moved is None:
+            return None
+    x = moved
+    for _ in range(len(nodes)):
+        x = pred[x].src
+    cycle, cur = [], x
+    while True:
+        e = pred[cur]
+        cycle.append(e)
+        cur = e.src
+        if cur == x:
+            break
+    cycle.reverse()
+    for i, e in enumerate(cycle):
+        if e.src == REF:
+            return cycle[i:] + cycle[:i]
+    return cycle
+
+
+def stn(keys, fixed, active):
+    """Return ({key: (lo, hi)} in ordinals, None), or (None, cycle) when the rules collide."""
+    nodes = [REF] + list(keys)
+    base = []
+    for c in active:
+        if c.hi is not None:
+            base.append(Edge(c.frm, c.to, c.hi, c, True))
+        base.append(Edge(c.to, c.frm, -c.lo, c, False))
+    for k, (lo, hi) in fixed.items():
+        base.append(Edge(REF, k, hi, Fixed(k)))
+        base.append(Edge(k, REF, -lo, Fixed(k), False))
+    not_before = {}
+    for c in active:
+        if c.not_before:
+            not_before.setdefault(c.to, []).append(c)
+    closure = {}
+    while True:
+        edges = base + [Edge(REF, k, w, Closure(k, g)) for k, (w, g) in closure.items()]
+        cycle = negative_cycle(nodes, edges)
+        if cycle:
+            return None, cycle
+        hi = shortest(nodes, edges, REF)
+        lo = shortest(nodes, edges, REF, reverse=True)
+        changed = False
+        for k, gs in not_before.items():
+            vals = [(hi[g.frm] + g.lo, g) for g in gs]
+            if any(v == INF for v, _ in vals):
+                continue
+            w, rule = max(vals, key=lambda t: t[0])
+            if w < hi[k]:
+                closure[k] = (w, rule)
+                changed = True
+        if not changed:
+            break
+    for k in keys:
+        if hi[k] == INF or lo[k] == INF:
+            raise ValueError(f"no rule or site input bounds {k!r}")
+    return {k: (-lo[k], hi[k]) for k in keys}, None
+
+
+def day(n):
+    return datetime.date.fromordinal(int(n)).isoformat()
+
+
+def span_words(n):
+    return f"{abs(n)} days"
+
+
+def clause(e, at):
+    """One step of a collision trail: the rule, and the latest date it leaves the event."""
+    c = e.source
+    if isinstance(c, Closure):
+        return f"{e.dst} starts as soon as {c.rule.name} allows, by {day(at)}"
+    if e.forward:
+        rel = "after" if e.w >= 0 else "before"
+        what = f"puts {e.dst} at most {span_words(e.w)} {rel} {e.src}" if e.w >= 0 else \
+            f"puts {e.dst} at least {span_words(e.w)} before {e.src}"
+    else:
+        what = f"puts {e.dst} at most {span_words(e.w)} after {e.src}" if e.w >= 0 else \
+            f"puts {e.dst} at least {span_words(e.w)} before {e.src}"
+    return f"the {c.kind} {c.name} {what}, by {day(at)}"
+
+
+def join(items):
+    return items[0] if len(items) == 1 else ", ".join(items[:-1]) + " and " + items[-1]
+
+
+def describe(cycle):
+    """Return (constraints, short days, message) for a negative cycle."""
+    short = -int(sum(e.w for e in cycle))
+    cons = []
+    for e in cycle:
+        c = e.source.rule if isinstance(e.source, Closure) else e.source
+        if isinstance(c, Constraint) and c not in cons:
+            cons.append(c)
+    cons.sort(key=lambda c: c.order)
+    reqs = [c.name for c in cons if c.kind == "requirement"]
+    ests = [c.name for c in cons if c.kind == "estimate"]
+    if reqs and ests:
+        head = (f"{'Requirement' if len(reqs) == 1 else 'Requirements'} {join(reqs)} "
+                f"{'is' if len(reqs) == 1 else 'are'} unmet unless the estimates {join(ests)} improve by {short} days in total")
+    elif ests:
+        head = f"The estimates {join(ests)} cannot all hold and are {short} days apart"
+    else:
+        head = f"{'Requirement' if len(reqs) == 1 else 'Requirements'} {join(reqs)} cannot hold with the fixed dates, {short} days short"
+    if cycle[0].src != REF or cycle[-1].dst != REF:
+        return cons, short, head
+    at = cycle[0].w
+    first = cycle[0]
+    parts = [f"{first.dst} starts as soon as {first.source.rule.name} allows, by {day(at)}"
+             if isinstance(first.source, Closure) else f"{first.dst} is no later than {day(at)}"]
+    for e in cycle[1:-2]:
+        at += e.w
+        parts.append(clause(e, at))
+    last, back = cycle[-2], cycle[-1]
+    floor = -back.w
+    c = last.source.rule if isinstance(last.source, Closure) else last.source
+    parts.append(f"but {last.dst} is no earlier than {day(floor)}, and the {c.kind} {c.name} "
+                 f"then puts {last.src} no earlier than {day(floor - last.w)}")
+    return cons, short, head + ". " + "; ".join(parts)
+
+
+def pick_set_aside(cons, cycle):
+    """Choose the rule that gives: a requirement, else an estimate, the last listed first."""
+    can_give = [c for c in cons if not c.not_before]
+    for kind in ("requirement", "estimate"):
+        pool = [c for c in can_give if c.kind == kind]
+        if pool:
+            return max(pool, key=lambda c: c.order)
+    return max(cons, key=lambda c: c.order)
+
+
+def solve(offsets, inputs):
+    """Return a Solution: displayed ranges as dates, and the conflicts that were flagged."""
+    rows = {m["key"]: m for m in offsets["milestones"]}
+    fixed, site_fixed = fixed_ordinals(rows, inputs)
+    active = [c for c in constraints_of(offsets)
+              if not (c.to in site_fixed and c.kind == "estimate")]
+    conflicts, set_aside_phases = [], set()
+    while True:
+        bounds, cycle = stn(list(rows), fixed, active)
+        if cycle is None:
+            break
+        cons, short, message = describe(cycle)
+        chosen = pick_set_aside(cons, cycle)
+        conflicts.append(Conflict(chosen.to, cons, short, chosen, message))
+        if chosen.phase:
+            set_aside_phases.add(chosen.phase)
+        active.remove(chosen)
+    ranges = {k: (datetime.date.fromordinal(lo), datetime.date.fromordinal(hi))
+              for k, (lo, hi) in bounds.items()}
+    return Solution(ranges, conflicts, set_aside_phases)
+
+
+def resolve(offsets, inputs):
+    """Return {key: (earliest, latest)} for every milestone in offsets."""
+    return solve(offsets, inputs).ranges
 
 
 def add_months(d, n):
@@ -132,10 +384,12 @@ def days(lo, hi):
     return f"{lo} days" if lo == hi else f"{lo} to {hi} days"
 
 
-def phase_flags(offsets, resolved):
+def phase_flags(offsets, resolved, skip=()):
     """Return [(end_key, message)] for phases whose actual span is outside the planned range."""
     out = []
     for p in offsets.get("phases", []):
+        if p["key"] in skip:
+            continue
         lo, hi = p["duration_days"]
         short, long_ = phase_span(p, resolved)
         where = f"{p['key']} runs {days(short, long_)} from {p['start']} to {p['end']}"
@@ -153,6 +407,33 @@ def render_phases(offsets, resolved):
         lo, hi = p["duration_days"]
         actual = days(*phase_pairing(p, resolved))
         lines.append(f"| `{p['key']}` | `{p['start']}` | `{p['end']}` | {days(lo, hi)} | {actual} | {p['basis']} |")
+    return "\n".join(lines)
+
+
+def render_set_aside(conflicts):
+    """Table of the rules set aside to draw the dates, in the order they were set aside."""
+    lines = ["| Set aside | Kind | Collides with | Days short |",
+             "| --------- | ---- | ------------- | ---------- |"]
+    for k in conflicts:
+        others = ", ".join(f"`{c.name}`" for c in k.constraints if c != k.set_aside)
+        lines.append(f"| `{k.set_aside.name}` | {k.set_aside.kind} | {others} | {k.short} |")
+    return "\n".join(lines)
+
+
+STATUSES = ("committed", "estimated", "assumed")
+
+
+def render_inputs(offsets, site):
+    """Table of every date the site gives, with its status and basis, in milestone order."""
+    basis, status = site.get("basis", {}), site.get("status", {})
+    lines = ["| Input | Date | Status | Basis |", "| ----- | ---- | ------ | ----- |"]
+    for m in offsets["milestones"]:
+        key = m["key"]
+        if key not in site["inputs"]:
+            continue
+        if status.get(key) not in STATUSES:
+            raise ValueError(f"input {key!r} needs a status, one of {STATUSES}")
+        lines.append(f"| `{key}` | {fmt(as_range(site['inputs'][key]))} | {status[key]} | {basis.get(key, m['basis'])} |")
     return "\n".join(lines)
 
 
@@ -195,17 +476,21 @@ def main(argv=None):
     if args.site not in sites["sites"]:
         raise SystemExit(f"no site {args.site!r} in sites.yaml; have {', '.join(sites['sites'])}")
     site = sites["sites"][args.site]
-    resolved = resolve(offsets, site["inputs"])
-    table = render_table(offsets, resolved, site.get("basis"))
+    solution = solve(offsets, site["inputs"])
+    resolved = solution.ranges
+    table = render_inputs(offsets, site) + "\n\n" + render_table(offsets, resolved, site.get("basis"))
     if offsets.get("phases"):
         table += "\n\n" + render_phases(offsets, resolved)
+    if solution.conflicts:
+        table += "\n\n" + render_set_aside(solution.conflicts)
     if args.write:
         rewrite_note(args.write, args.site, table)
         print(f"rewrote {args.site} block in {args.write}")
     else:
         print(table)
-    for key, msg in (flags(resolved, site["limits"], sites["owner"]["away"])
-                     + phase_flags(offsets, resolved)):
+    for key, msg in ([(c.key, c.message) for c in solution.conflicts]
+                     + flags(resolved, site["limits"], sites["owner"]["away"])
+                     + phase_flags(offsets, resolved, solution.set_aside_phases)):
         print(f"flag: {key}: {msg}", file=sys.stderr)
 
 
