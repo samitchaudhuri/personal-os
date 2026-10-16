@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 """Export the opening timeline workbook to a CSV for a Gantt tool.
 
-Each task row of the workbook becomes one CSV row with its group, category,
-bar start and end, and proposed predecessors from timeline-dependencies.yaml.
+Each task row of the workbook becomes one CSV row with its category, group,
+sample bar start and end, and proposed predecessors from timeline-dependencies.yaml.
+Rows stay in their categories, and within a category run in time order, by the site estimate when
+there is one and else the bar, with each task after its predecessors in the category.
 Bars are the colored cells of the row. Column D is week 1, and column N of the
 sheet starts B2 plus seven days times its week number, so dates come from the
 anchor date in B2 and not from the formula cells, which hold no cached values
 after a script saves the file. A bar's end is the last day of its last week.
 
-With --site, rows that offsets.yaml maps to a milestone also carry that
-milestone's key and the generator's estimate for the site, beside the bar.
+With --site, rows that offsets.yaml maps to a milestone carry that milestone's key in brackets after its name and the
+generator's earliest and latest dates for the site as start and end. The template's bar dates
+are sample_start and sample_end. The duration column is the days from start to end, and the constraint column lists the offsets.yaml rules
+that touch the milestone, as in '45 days after 32', plus any proposed predecessor no rule covers. Rows the generator does not cover leave start and end blank.
 
 With --teamgantt, the CSV takes TeamGantt's work breakdown structure layout
 instead: a WBS # column, where 1 is the project, 1.n a group and 1.n.m a task,
@@ -22,6 +26,7 @@ import argparse
 import csv
 import datetime
 import os
+import re
 import sys
 
 import openpyxl
@@ -36,8 +41,11 @@ FIRST_WEEK_COL, LAST_WEEK_COL = 4, 40
 # Fills that draw the grid, not a bar, and the dark line that marks opening day.
 NEUTRAL = {"FFF0EEE9", "FFFCFAF5", "FFFFFFFF"}
 OPENING_LINE = "FF2C2926"
-COLUMNS = ["row", "task", "group", "category", "start", "end", "duration_days", "predecessors",
-           "why", "milestone", "estimate_start", "estimate_end"]
+COLUMNS = ["id", "milestone", "department", "phase", "start", "end", "duration", "constraint",
+           "sample_start", "sample_end", "sample_duration", "why"]
+
+# The workbook's group names, shortened for the export.
+PHASE_NAMES = {"Site Selection & Legal": "Site Selection", "Lease, Design & Construction": "Lease, Design & Build"}
 
 
 def bar_weeks(ws, row):
@@ -71,7 +79,7 @@ def read_tasks(ws):
         if not name:
             continue
         if category is None and not bar_weeks(ws, row):
-            group = name
+            group = PHASE_NAMES.get(name, name)
             continue
         weeks = bar_weeks(ws, row)
         start = end = None
@@ -124,24 +132,114 @@ def early_starts(tasks, deps):
     return out
 
 
-def build_rows(tasks, deps, estimates=None):
-    """Return CSV rows. estimates maps a Gantt row to (key, (earliest, latest))."""
+def predecessor_first(tasks, deps, estimates=None):
+    """Return the tasks grouped by category in first-seen order, each category in time order.
+
+    Within a category, a task's time is the start of its site estimate when it has one, else its
+    bar start. Each step takes the ready task, one whose predecessors in the category are all
+    placed, with the earliest time, and workbook order breaks ties. A predecessor in another
+    category does not hold a task back.
+    """
     estimates = estimates or {}
+
+    def when(t):
+        est = estimates.get(t["row"], ("", (None, None)))[1][0]
+        return est or t["start"] or datetime.date.max
+
+    groups = []
+    for t in tasks:
+        if t["category"] not in groups:
+            groups.append(t["category"])
+    out = []
+    for g in groups:
+        left = [t for t in tasks if t["category"] == g]
+        mine = {t["row"] for t in left}
+        placed = set()
+        while left:
+            ready = [t for t in left
+                     if all(p in placed or p not in mine for p in deps.get(t["row"], {}).get("after", []))]
+            nxt = min(ready, key=when)
+            left.remove(nxt)
+            placed.add(nxt["row"])
+            out.append(nxt)
+    return out
+
+
+def build_rows(tasks, deps, estimates=None, rules=None, extras=None):
+    """Return CSV rows. estimates maps a Gantt row to (key, (earliest, latest)); rules maps a
+    milestone key to its generator rules, as (text, rows the rule says this one comes after). extras maps
+    a Gantt row to the further milestones on it, as (id, key, label, (earliest, latest)), which follow it
+    as rows of their own."""
+    estimates, rules, extras = estimates or {}, rules or {}, extras or {}
     out = []
     for t in tasks:
         d = deps.get(t["row"], {})
         key, est = estimates.get(t["row"], ("", (None, None)))
+        texts = [r[0] for r in rules.get(key, [])]
+        covered = {x for r in rules.get(key, []) for x in r[1]}
+        texts += [f"after <<{p}>>" for p in d.get("after", []) if p not in covered]
         out.append({
-            "row": t["row"], "task": t["task"], "group": t["group"], "category": t["category"] or "",
-            "start": t["start"].isoformat() if t["start"] else "",
-            "end": t["end"].isoformat() if t["end"] else "",
-            "duration_days": (t["end"] - t["start"]).days + 1 if t["start"] else "",
-            "predecessors": ";".join(str(p) for p in d.get("after", [])),
+            "id": t["row"], "milestone": f"{t['task']} ({key})" if key else t["task"],
+            "department": t["category"] or "", "phase": t["group"],
+            "start": est[0].isoformat() if est[0] else "",
+            "end": est[1].isoformat() if est[1] else "",
+            "duration": (est[1] - est[0]).days if est[0] and est[1] else "",
+            "constraint": "; ".join(texts),
             "why": d.get("why", ""),
-            "milestone": key,
-            "estimate_start": est[0].isoformat() if est[0] else "",
-            "estimate_end": est[1].isoformat() if est[1] else "",
+            "sample_start": t["start"].isoformat() if t["start"] else "",
+            "sample_end": t["end"].isoformat() if t["end"] else "",
+            "sample_duration": (t["end"] - t["start"]).days + 1 if t["start"] else "",
         })
+        for xid, xkey, label, (lo, hi) in extras.get(t["row"], []):
+            out.append({
+                "id": xid, "milestone": f"{label} ({xkey})",
+                "department": t["category"] or "", "phase": t["group"],
+                "start": lo.isoformat(), "end": hi.isoformat(), "duration": (hi - lo).days,
+                "constraint": "; ".join(r[0] for r in rules.get(xkey, [])),
+            })
+    return renumber(out)
+
+
+def renumber(rows):
+    """Number the rows 1..N in their final order and point every <<old id>> in a constraint at the new number."""
+    new = {r["id"]: i for i, r in enumerate(rows, 1)}
+    for r in rows:
+        r["constraint"] = re.sub(r"<<(.+?)>>", lambda m: str(new[int(m[1]) if m[1].isdigit() else m[1]]),
+                                 r["constraint"])
+        r["id"] = new[r["id"]]
+    return rows
+
+
+def milestone_ids(offsets):
+    """Map each milestone key to its CSV id: the Gantt row for the first milestone on a row, then 32.1, 32.2."""
+    ids, seen = {}, {}
+    for m in offsets["milestones"]:
+        row = m.get("gantt_row")
+        if not row:
+            continue
+        seen[row] = seen.get(row, 0) + 1
+        ids[m["key"]] = row if seen[row] == 1 else f"{row}.{seen[row] - 1}"
+    return ids
+
+
+def milestone_rules():
+    """Map each milestone key to the generator rules that date it, as (text, rows it comes after).
+
+    A rule reads '45 days after <<32>>' on the later milestone only, where <<32>> stands for the id of the
+    earlier one and build_rows swaps in its final number, from offsets.yaml. A milestone with no Gantt row is named by its key, a range reads
+    '14-28 days', a rule from the milestone where the row starts is left out because the duration shows it, and a not-before rule reads 'at least 10 days'.
+    """
+    offsets = ms.load_yaml("offsets.yaml")
+    ids = milestone_ids(offsets)
+    span_from = {m["key"]: m["span_from"] for m in offsets["milestones"] if m.get("span_from")}
+    out = {}
+    for c in ms.constraints_of(offsets):
+        span = (f"at least {c.lo} days" if c.hi is None else f"{c.lo} days" if c.hi == c.lo
+                else f"{c.lo}-{c.hi} days")
+        frm = ids.get(c.frm)
+        if span_from.get(c.to) == c.frm:
+            continue    # the row begins at that milestone, so its duration already says it
+        out.setdefault(c.to, []).append((f"{span} after " + (f"<<{frm}>>" if frm else c.frm), [frm] if frm else []))
     return out
 
 
@@ -155,7 +253,26 @@ def site_estimates(site):
     for m in offsets["milestones"]:
         row = m.get("gantt_row")
         if row and row not in out:
-            out[row] = (m["key"], resolved[m["key"]])
+            lo, hi = resolved[m["key"]]
+            if m.get("span_from"):
+                lo = resolved[m["span_from"]][0]
+            out[row] = (m["key"], (lo, hi))
+    return out
+
+
+def extra_milestones(site):
+    """Map a Gantt row to its second and later milestones, as (id, key, label, (earliest, latest))."""
+    offsets, sites = ms.load_yaml("offsets.yaml"), ms.load_yaml("sites.yaml")
+    resolved = ms.resolve(offsets, sites["sites"][site]["inputs"])
+    ids, first, out = milestone_ids(offsets), {}, {}
+    for m in offsets["milestones"]:
+        row = m.get("gantt_row")
+        if not row:
+            continue
+        if row not in first:
+            first[row] = m["key"]
+        else:
+            out.setdefault(row, []).append((ids[m["key"]], m["key"], m["label"], resolved[m["key"]]))
     return out
 
 
@@ -238,7 +355,9 @@ def main(argv=None):
             print(f"warning: {count} tasks exceed TeamGantt's free limit of {TEAMGANTT_FREE_TASKS}",
                   file=sys.stderr)
     else:
-        rows = build_rows(tasks, deps, site_estimates(args.site) if args.site else None)
+        est = site_estimates(args.site) if args.site else None
+        rows = build_rows(predecessor_first(tasks, deps, est), deps, est, milestone_rules() if est else None,
+                          extra_milestones(args.site) if est else None)
         columns, count = COLUMNS, len(rows)
     if args.out:
         with open(args.out, "w", encoding="utf-8", newline="") as fh:

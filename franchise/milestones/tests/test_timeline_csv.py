@@ -94,9 +94,36 @@ class TestBuildRows(unittest.TestCase):
         deps = {7: {"after": [], "why": ""}, 8: {"after": [7], "why": "after the first"}}
         est = {7: ("some-key", (D(2026, 8, 1), D(2026, 8, 5)))}
         rows = tc.build_rows(tasks, deps, est)
-        self.assertEqual(rows[0]["duration_days"], 21)
-        self.assertEqual((rows[0]["milestone"], rows[0]["estimate_start"]), ("some-key", "2026-08-01"))
-        self.assertEqual((rows[1]["predecessors"], rows[1]["start"]), ("7", ""))
+        self.assertEqual(rows[0]["sample_duration"], 21)
+        self.assertEqual((rows[0]["milestone"], rows[0]["start"]), ("First task (some-key)", "2026-08-01"))
+        self.assertEqual((rows[1]["constraint"], rows[1]["start"], rows[1]["sample_start"]), ("after 1", "", ""))
+
+    def test_constraint_reads_as_a_duration_after_an_earlier_row(self):
+        r = tc.milestone_rules()
+        self.assertNotIn("gm-offer-accepted", r)    # the row starts at gm-sourcing, so its duration says 45 days
+        self.assertEqual(r["gm-in-seat"], [("14-28 days after <<32>>", [32])])
+        self.assertIn("at least 10 days after permits-received", [t for t, _ in r["construction-start"]])
+        self.assertNotIn("lease-signed", r)
+
+    def test_a_second_milestone_on_a_row_gets_its_own_row(self):
+        ex = tc.extra_milestones("junction")
+        self.assertEqual([(x[0], x[1]) for x in ex[32]], [("32.1", "gm-in-seat")])
+
+    def test_the_gm_row_spans_sourcing_to_the_accepted_offer(self):
+        est = tc.site_estimates("junction")[32]
+        self.assertEqual((est[0], est[1][0], est[1][1]), ("gm-offer-accepted", D(2026, 10, 6), D(2026, 11, 20)))
+
+    def test_rows_are_numbered_in_order_and_references_follow(self):
+        rows = [{"id": 7, "constraint": ""}, {"id": "32.1", "constraint": "5 days after <<7>>"},
+                {"id": 9, "constraint": "after <<32.1>>; 3 days after key"}]
+        out = tc.renumber(rows)
+        self.assertEqual([(r["id"], r["constraint"]) for r in out],
+                         [(1, ""), (2, "5 days after 1"), (3, "after 2; 3 days after key")])
+
+    def test_duration_is_the_days_from_start_to_end(self):
+        tasks = tc.read_tasks(book())
+        rows = tc.build_rows(tasks, {}, {7: ("k", (D(2026, 8, 1), D(2026, 8, 11)))})
+        self.assertEqual(rows[0]["duration"], 10)
 
     def test_early_start_is_reported(self):
         ws = book()
@@ -112,6 +139,28 @@ class TestBuildRows(unittest.TestCase):
         lines = out.getvalue().splitlines()
         self.assertEqual(lines[0], ",".join(tc.COLUMNS))
         self.assertEqual(len(lines), 1 + len(tasks))
+
+    def test_predecessors_come_before_successors(self):
+        tasks = [{"row": r, "category": "g", "start": D(2026, 1, r)} for r in (1, 2, 3)]
+        deps = {1: {"after": [3]}, 3: {"after": [2]}}
+        self.assertEqual([t["row"] for t in tc.predecessor_first(tasks, deps)], [2, 3, 1])
+
+    def test_time_orders_rows_when_no_dependency_does(self):
+        tasks = [{"row": 1, "category": "g", "start": D(2026, 1, 1)}, {"row": 2, "category": "g", "start": D(2026, 2, 1)}]
+        est = {1: ("k", (D(2026, 5, 1), None))}
+        self.assertEqual([t["row"] for t in tc.predecessor_first(tasks, {}, est)], [2, 1])
+
+    def test_categories_stay_together_in_workbook_order(self):
+        tasks = [{"row": 1, "category": "a", "start": D(2026, 3, 1)}, {"row": 2, "category": "b", "start": D(2026, 1, 1)},
+                 {"row": 3, "category": "a", "start": D(2026, 2, 1)}]
+        self.assertEqual([t["row"] for t in tc.predecessor_first(tasks, {})], [3, 1, 2])
+
+    def test_row_25_stays_on_equipment_ordered_and_new_equipment_milestones_have_no_row(self):
+        est = tc.site_estimates("junction")
+        self.assertEqual(est[25][0], "equipment-ordered")
+        self.assertEqual(est[29][0], "equipment-delivered")
+        self.assertNotIn("av-ordered", [k for k, _ in est.values()])
+        self.assertNotIn("equipment-paid", [k for k, _ in est.values()])
 
 
 if __name__ == "__main__":

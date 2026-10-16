@@ -1,6 +1,6 @@
 # Milestone generator
 
-Computes a site's milestone dates from one offsets file, so the Junction milestones table in `vault/Notes/ULC Franchise Project.md` stops drifting from the plan when the lease or opening date moves. The method and the reason for a single offsets file are in the vault note under "Plan for generating the milestone tables". Task: `ulc-milestone-generator`.
+Computes a site's milestone dates from one set of durations in `offsets.yaml`, so the Junction milestones table in `vault/Notes/ULC Franchise Project.md` stops drifting from the plan when the lease or opening date moves. The method and the reason for a single durations file are in the vault note under "Plan for generating the milestone tables". Task: `ulc-milestone-generator`.
 
 ## Terms
 
@@ -8,11 +8,13 @@ A milestone is a dated event, such as lease signed. An input is a milestone whos
 
 ## Files
 
-`offsets.yaml` holds one row per milestone, the list of rules between milestones, and four phases. Each rule says the second milestone falls within a range of days of the first, and the range can be negative, such as the GM 21 days before presale launch. A milestone reached by several rules gets the intersection of all of them, and each rule narrows both ends, so the GM requirement narrows launch given the GM and the GM given launch. Keys are stable names that vault goals and targets link to.
+`offsets.yaml` holds one row per milestone, the list of rules between milestones, and four phases. Each rule says the second milestone falls within a duration range, in days, of the first, and the range can be negative, such as the GM 21 days before presale launch. A milestone reached by several rules gets the intersection of all of them, and each rule narrows both ends, so the GM requirement narrows launch given the GM and the GM given launch. Keys are stable names that vault goals and targets link to.
 
 A not-before rule is written with `null` as the upper limit, such as `[10, null]`. `construction-start` has two, delivery and permits plus 10 days. It starts as soon as the later one allows, so its latest date is the later of their latest dates. Rent commences works the same way, 150 days after the later of delivery and permits.
 
 A site must give every milestone marked `input: true`, such as the kickoff call, the lease range, the GM sourcing date and landlord delivery, and must record a status for each in the site's `status` block. The generator computes every other milestone. A milestone marked `site_can_fix: true`, such as `permits-submitted`, `permits-received`, `vip-start` and `presale-launch`, takes a date from the site when the site gives one. That date replaces the estimates that compute the milestone, and requirements on it still apply. Junction assumes `landlord-delivery` is 2/8, the latest date permits can be approved, so that delivery never delays construction. A date the landlord commits to replaces it with a committed status. An earlier date changes nothing, and a later one moves the earliest build dates at once and the latest ones once it passes 2/18.
+
+Equipment, A/V and millwork have separate dates. `equipment-paid` falls 45 to 60 days before soft open, which is Don Michael's timing from 10/14 for the $478K invoice. `equipment-ordered` follows payment, because the invoice must be paid before the order is placed, and that is a not-before requirement. `av-ordered` sits 84 days before `equipment-delivered`, the franchisor template's 12-week A/V lead time, and it stays an estimate until MMP confirms it. Millwork has no lead time of its own yet and stays with the install start. The two chains do not meet, so the model leaves open whether the invoice includes A/V and millwork. Adding a rule that A/V is ordered after payment would collide by 45 days, because an A/V order 60 days before soft open arrives 24 days after it.
 
 A phase is a rule that also has a table row: `permit-review`, `presale-setup`, `presale-vip-booking` and `presale-membership-sales`. The last one bounds `soft-open` from launch, so the build and the sales window must agree. The generator still flags any phase whose actual span falls outside its range, which today happens when a date from the site replaces the estimate.
 
@@ -22,7 +24,7 @@ When the rules cannot all hold, the generator flags the collision. It names the 
 
 `milestones.py` solves the rules as a network of date ranges, finds collisions as negative cycles, and prints three tables. The Inputs table lists every date the site gave, its status and its basis, and it comes first because the schedule below it assumes those dates. The inputs show as given, so a lease range that the permits date narrows appears in full there and narrower in the milestone table. With `--write NOTE` it rewrites the block between `<!-- milestones:SITE:start -->` and `<!-- milestones:SITE:end -->` in that note and fails if the markers are missing.
 
-`timeline_csv.py` exports the opening timeline workbook to a CSV for a Gantt tool, one row per task with its group, category, bar start and end, and proposed predecessors from `timeline-dependencies.yaml`. With `--site` it adds the milestone key and the generator's estimate beside the bar for each row that `offsets.yaml` maps. The bars are the template's sample timeline shifted to the workbook's anchor date in B2, so the estimate columns are the Junction dates and the start and end columns are not.
+`timeline_csv.py` exports the opening timeline workbook to a CSV for a Gantt tool, one row per task, numbered 1 to N in the order shown and no longer the workbook's row numbers, with its `id`, `milestone` (the workbook task name, followed by the milestone key in brackets where `offsets.yaml` maps one), `department` and `phase` and a `constraint` column. Each constraint reads like `45 days after 32` or `at least 10 days after permits-received` and comes from the `offsets.yaml` rules that date that row's milestone, on the later milestone only,, with a milestone that has no row named by its key, and any proposed predecessor from `timeline-dependencies.yaml` that no rule covers reads `after 7`. The `duration` column is the days from `start` to `end`. With `--site` it fills the milestone key and the generator's dates in the `start` and `end` columns for each row that `offsets.yaml` maps and leaves them blank for the rest, and when several milestones share a row the first one listed wins. Row 25 stays on `equipment-ordered`, so its estimate now follows payment, and `av-ordered` and `equipment-paid` have no row because the template has no bar for them. The template's bars are the sample timeline shifted to the workbook's anchor date in B2, and they sit at the right as `sample_start`, `sample_end` and `sample_duration`. Rows run grouped by category and in time order within each category, by the generator's start where there is one and else the sample start, with each task after its predecessors in the category.
 
 ## Run
 
@@ -46,4 +48,4 @@ cd franchise/milestones && ./.venv/bin/python -m unittest discover -s tests
 
 ## Not built yet
 
-Mark's and MMP's confirmation of the template's buildout durations. A second site and the combined table with sites as columns.
+Mark's and MMP's confirmation of the template's buildout durations, and MMP's A/V lead time. A second site and the combined table with sites as columns.

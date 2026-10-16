@@ -14,12 +14,16 @@ sites:
       gm-sourcing: 2026-10-06       # Fibr's clock start, per Regan Hahn on the 10/7 call
       lease-signed: [2026-11-30, 2026-12-15] # draft about 10/15 plus Anson's 45 to 60 days; Lynnsee's 6-week average falls just before
       landlord-delivery: 2027-02-08 # planning assumption, not a landlord commitment: the latest permit approval, so delivery never delays the build. Replace it when the landlord commits
+      construction-documents-complete: 2026-12-04 # Vision Track completion on 10/14
+      bid-complete: 2026-12-22 # Vision Track completion on 10/14
       permits-submitted: 2026-12-14 # Vision Track permitting start on 10/14, after construction documents finish 12/4
     status:
       presale-kickoff: committed
       lease-signed: estimated
       gm-sourcing: committed
       landlord-delivery: assumed
+      construction-documents-complete: committed
+      bid-complete: committed
       permits-submitted: estimated
     limits:
       site_acquisition_deadline: 2026-11-09
@@ -28,6 +32,8 @@ sites:
       opening_extension_fee_per_month: 2500
       gm_hard_stop: 2026-12-11
     basis:
+      construction-documents-complete: Vision Track completion date for construction documents, shown by Jason Park on 10/14
+      bid-complete: Vision Track completion date for the bid, shown by Jason Park on 10/14
       permits-submitted: Vision Track submits on 12/14 once construction documents finish 12/4, which falls inside the Counter LOI's 60 days after the lease
       landlord-delivery: Our planning assumption is 2/8, the latest date permits can be approved, so that delivery never delays construction. A commitment from the landlord replaces it, and a later date moves the build dates while an earlier one changes nothing; Greg's April 2027 availability from 8/27 is not committed, and Jason Park is asking Anson for the real date
       gm-sourcing: Regan Hahn said on the 10/7 call that the Fibr clock started 10/6, the day Samit signed the agreement, so the first vetted candidates reach Michelle between 10/13 and 10/16

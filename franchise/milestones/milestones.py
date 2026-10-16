@@ -2,7 +2,7 @@
 """Compute a site's milestone dates from offsets.yaml and sites.yaml.
 
 Every milestone is a date range. Inputs come from sites.yaml, and each other
-milestone sits an offset range from one it names, or from the latest of several
+milestone sits a duration range from one it names, or from the latest of several
 it names, or a phase duration from the milestone that starts that phase, so a slip in the lease or kickoff date moves
 everything downstream. The table it prints has the same
 columns as the Junction milestones table in `ULC Franchise Project.md`, and
@@ -109,11 +109,11 @@ def constraints_of(offsets):
     keys = {m["key"] for m in offsets["milestones"]}
     out = []
     rows = [dict(c, name=c.get("name")) for c in offsets.get("constraints", [])]
-    rows += [dict(from_=p["start"], to=p["end"], days=p["duration_days"], kind=p["kind"],
+    rows += [dict(from_=p["start"], to=p["end"], duration_days=p["duration_days"], kind=p["kind"],
                   name=p["key"], phase=p["key"]) for p in offsets.get("phases", [])]
     for i, c in enumerate(rows):
         frm = c.get("from_") or c["from"]
-        lo, hi = c["days"]
+        lo, hi = c["duration_days"]
         if c["kind"] not in KINDS:
             raise ValueError(f"rule {frm} to {c['to']} has kind {c['kind']!r}, not one of {KINDS}")
         for k in (frm, c["to"]):

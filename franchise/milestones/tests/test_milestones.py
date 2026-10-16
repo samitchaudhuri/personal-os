@@ -31,7 +31,7 @@ def synthetic(constraints, events, **fixed):
 
 
 def c(frm, to, lo, hi, kind="estimate"):
-    return {"from": frm, "to": to, "days": [lo, hi], "kind": kind}
+    return {"from": frm, "to": to, "duration_days": [lo, hi], "kind": kind}
 
 
 class TestResolve(unittest.TestCase):
@@ -55,9 +55,36 @@ class TestResolve(unittest.TestCase):
         self.assertEqual(r["construction-start"], rg((2027, 2, 8), (2027, 2, 18)))
         self.assertEqual(r["lighting-flooring"], rg((2027, 3, 22), (2027, 4, 1)))
         self.assertEqual(r["equipment-delivered"], rg((2027, 5, 10), (2027, 5, 20)))
-        self.assertEqual(r["equipment-ordered"], rg((2027, 2, 15), (2027, 2, 25)))
+        self.assertEqual(r["av-ordered"], rg((2027, 2, 15), (2027, 2, 25)))
+        self.assertEqual(r["equipment-paid"], rg((2027, 4, 1), (2027, 4, 26)))
+        self.assertEqual(r["equipment-ordered"], rg((2027, 4, 1), (2027, 4, 26)))
         self.assertEqual(r["build-complete"], rg((2027, 5, 24), (2027, 6, 3)))
         self.assertEqual(r["soft-open"], rg((2027, 5, 31), (2027, 6, 10)))
+
+    def test_equipment_is_paid_45_to_60_days_before_soft_open_and_ordered_after_payment(self):
+        r = junction()
+        soft_lo, soft_hi = r["soft-open"]
+        paid_lo, paid_hi = r["equipment-paid"]
+        self.assertEqual((soft_lo - paid_lo).days, 60)
+        self.assertEqual((soft_hi - paid_hi).days, 45)
+        self.assertGreaterEqual(r["equipment-ordered"][0], paid_lo)
+        self.assertLessEqual(r["equipment-ordered"][1], paid_hi)
+
+    def test_av_is_ordered_84_days_before_install_whatever_the_payment_date(self):
+        r = junction()
+        self.assertEqual((r["equipment-delivered"][0] - r["av-ordered"][0]).days, 84)
+        self.assertLess(r["av-ordered"][1], r["equipment-paid"][0])
+
+    def test_av_lead_time_is_an_estimate_and_payment_before_order_is_a_requirement(self):
+        rules = {(x.frm, x.to): x for x in ms.constraints_of(OFFSETS)}
+        self.assertEqual(rules[("av-ordered", "equipment-delivered")].kind, "estimate")
+        self.assertEqual(rules[("equipment-paid", "soft-open")].kind, "estimate")
+        paid_first = rules[("equipment-paid", "equipment-ordered")]
+        self.assertEqual((paid_first.kind, paid_first.not_before), ("requirement", True))
+
+    def test_new_equipment_milestones_add_no_flags_or_collisions(self):
+        sol = ms.solve(OFFSETS, JUNCTION["inputs"])
+        self.assertEqual([k.set_aside.name for k in sol.conflicts], ["gm-in-seat to presale-launch"])
 
     def test_permit_review_follows_submission(self):
         r = junction()

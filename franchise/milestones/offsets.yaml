@@ -3,12 +3,13 @@
 # for three weeks before. Keys are the stable names that goals and targets link to
 # in the vault; never rename one without updating those links.
 # gantt_row is the row in `ULC Center Opening Timeline.xlsx`, blank where the
-# template has no bar.
+# template has no bar. `span_from` names a milestone where the row's bar starts, so the
+# Gantt row runs from that milestone to this one, such as GM sourcing to the accepted offer.
 #
-# Each rule has `from`, `to`, `days` [lo, hi] and a `kind`. An estimate is a
+# Each rule has `from`, `to`, `duration_days` [lo, hi] and a `kind`. An estimate is a
 # forecast of how long something takes, such as Fibr's 45 days. A requirement is
-# a gap somebody needs to hold, such as the GM sitting 3 weeks before launch. A
-# `days` pair with hi null, such as [10, null], is a not-before rule: it sets the
+# a duration somebody needs to hold, such as the GM sitting 3 weeks before launch. A
+# `duration_days` pair with hi null, such as [10, null], is a not-before rule: it sets the
 # earliest date and no latest date. A milestone with not-before rules starts as
 # soon as the latest of them allows, so its latest date is the latest of their
 # latest dates.
@@ -61,20 +62,22 @@ phases:
     basis: Michelle Tomko said on 10/14 that membership sales run 4 to 6 months, which replaces the deck and the playbook's 3 to 5 months. Soft open mostly comes from the build chain, so this phase bounds it from launch and flags a build that falls outside the window
 
 constraints:
-  - {from: gm-sourcing, to: gm-offer-accepted, days: [45, 45], kind: estimate}
-  - {from: gm-offer-accepted, to: gm-in-seat, days: [14, 28], kind: estimate}
-  - {from: gm-in-seat, to: presale-launch, days: [21, 21], kind: requirement}
-  - {from: lease-signed, to: permits-submitted, days: [0, 60], kind: requirement}
-  - {from: landlord-delivery, to: construction-start, days: [0, null], kind: requirement}
-  - {from: permits-received, to: construction-start, days: [10, null], kind: estimate}
-  - {from: landlord-delivery, to: rent-commences, days: [150, null], kind: requirement}
-  - {from: permits-received, to: rent-commences, days: [150, null], kind: requirement}
-  - {from: construction-start, to: lighting-flooring, days: [42, 42], kind: estimate}
-  - {from: construction-start, to: equipment-delivered, days: [91, 91], kind: estimate}
-  - {from: equipment-delivered, to: equipment-ordered, days: [-84, -84], kind: estimate}
-  - {from: construction-start, to: build-complete, days: [105, 105], kind: estimate}
-  - {from: construction-start, to: soft-open, days: [112, 112], kind: estimate}
-  - {from: soft-open, to: grand-opening, days: [42, 56], kind: estimate}
+  - {from: gm-sourcing, to: gm-offer-accepted, duration_days: [45, 45], kind: estimate}
+  - {from: gm-offer-accepted, to: gm-in-seat, duration_days: [14, 28], kind: estimate}
+  - {from: gm-in-seat, to: presale-launch, duration_days: [21, 21], kind: requirement}
+  - {from: lease-signed, to: permits-submitted, duration_days: [0, 60], kind: requirement}
+  - {from: landlord-delivery, to: construction-start, duration_days: [0, null], kind: requirement}
+  - {from: permits-received, to: construction-start, duration_days: [10, null], kind: estimate}
+  - {from: landlord-delivery, to: rent-commences, duration_days: [150, null], kind: requirement}
+  - {from: permits-received, to: rent-commences, duration_days: [150, null], kind: requirement}
+  - {from: construction-start, to: lighting-flooring, duration_days: [42, 42], kind: estimate}
+  - {from: construction-start, to: equipment-delivered, duration_days: [91, 91], kind: estimate}
+  - {from: av-ordered, to: equipment-delivered, duration_days: [84, 84], kind: estimate}
+  - {from: equipment-paid, to: soft-open, duration_days: [45, 60], kind: estimate}
+  - {from: equipment-paid, to: equipment-ordered, duration_days: [0, null], kind: requirement}
+  - {from: construction-start, to: build-complete, duration_days: [105, 105], kind: estimate}
+  - {from: construction-start, to: soft-open, duration_days: [112, 112], kind: estimate}
+  - {from: soft-open, to: grand-opening, duration_days: [42, 56], kind: estimate}
 
 milestones:
   - key: presale-kickoff
@@ -91,19 +94,32 @@ milestones:
 
   - key: gm-sourcing
     label: GM sourcing begins
-    gantt_row: 32
+    gantt_row:
     input: true
     basis: Fibr, the recruiter ULC sponsors, starts the search, and the site supplies the date
 
   - key: gm-offer-accepted
     label: GM offer accepted
     gantt_row: 32
+    span_from: gm-sourcing
     basis: Regan Hahn at Fibr quoted 45 days from the start of the search to an accepted offer on the 10/7 call, which Samit confirmed, and Michelle's checkpoint for an accepted offer is 10/31
 
   - key: gm-in-seat
     label: GM in seat
     gantt_row: 32
     basis: Two to four weeks of notice between the accepted offer and the start date, and Michelle Tomko requires the GM in seat 3 weeks before presale launch. Corporate reviews the GM's goals weekly
+
+  - key: construction-documents-complete
+    label: Construction documents complete
+    gantt_row: 22
+    input: true
+    basis: Vision Track shows construction documents from 11/26 to 12/4 in the 10/14 walkthrough with Jason Park, and the architect starts from the space plan and site survey report due 10/23
+
+  - key: bid-complete
+    label: GC bids received
+    gantt_row: 23
+    input: true
+    basis: Vision Track shows the bid from 12/8 to 12/22, and Jason Park wants three to five GC bids within about two weeks so resubmissions fit before permits
 
   - key: permits-submitted
     label: Permits submitted
@@ -139,14 +155,24 @@ milestones:
     basis: Template puts it six weeks into the build, week of 12/30 against a 11/18 start
 
   - key: equipment-delivered
-    label: Equipment, A/V and millwork install starts
+    label: Equipment and millwork install starts
     gantt_row: 29
-    basis: Template starts install 13 weeks into the build and finishes it the week of 2/24, to confirm with MMP
+    basis: Template starts install 13 weeks into the build and finishes it the week of 2/24, to confirm with MMP. The A/V package must arrive by this date, and millwork has no lead time of its own yet
+
+  - key: av-ordered
+    label: A/V ordered
+    gantt_row:
+    basis: The franchisor template gives the A/V package a 12-week lead time, 84 days, before install. No vendor has confirmed it, so it stays an estimate until MMP does, and it is open whether the 84 days run from this order or from payment
+
+  - key: equipment-paid
+    label: Equipment invoice paid
+    gantt_row:
+    basis: Don Michael said on 10/14 that the equipment invoice, $478K, is paid 45 to 60 days before soft open. Samit's position is that the invoice is paid before the equipment order is placed, and it is open whether the invoice includes A/V and millwork or equipment alone
 
   - key: equipment-ordered
     label: Equipment ordered
     gantt_row: 25
-    basis: ULC's estimate for MMP, who takes the date from ULC and starts the draw from it. It is the latest order date for the A/V package's 12-week lead time, and the template orders earlier, before construction starts
+    basis: Placed once the invoice is paid, so it falls in the same 45 to 60 days before soft open. ULC gives MMP the date, and MMP starts the draw from it. The template's row 25 orders earlier, before construction starts, because it follows the A/V lead time, which this table now carries as A/V ordered
 
   - key: build-complete
     label: Certificate of occupancy issued
