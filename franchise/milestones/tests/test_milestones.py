@@ -13,14 +13,14 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import milestones as ms  # noqa: E402
 
 D = datetime.date
-OFFSETS = ms.load_yaml("offsets.yaml")
+DURATIONS = ms.load_yaml("durations.yaml")
 SITES = ms.load_yaml("sites.yaml")
 JUNCTION = SITES["sites"]["junction"]
 AWAY = SITES["owner"]["away"]
 
 
 def junction():
-    return ms.resolve(OFFSETS, JUNCTION["inputs"])
+    return ms.resolve(DURATIONS, JUNCTION["inputs"])
 
 
 def synthetic(constraints, events, **fixed):
@@ -76,14 +76,14 @@ class TestResolve(unittest.TestCase):
         self.assertLess(r["av-ordered"][1], r["equipment-paid"][0])
 
     def test_av_lead_time_is_an_estimate_and_payment_before_order_is_a_requirement(self):
-        rules = {(x.frm, x.to): x for x in ms.constraints_of(OFFSETS)}
+        rules = {(x.frm, x.to): x for x in ms.constraints_of(DURATIONS)}
         self.assertEqual(rules[("av-ordered", "equipment-delivered")].kind, "estimate")
         self.assertEqual(rules[("equipment-paid", "soft-open")].kind, "estimate")
         paid_first = rules[("equipment-paid", "equipment-ordered")]
         self.assertEqual((paid_first.kind, paid_first.not_before), ("requirement", True))
 
     def test_new_equipment_milestones_add_no_flags_or_collisions(self):
-        sol = ms.solve(OFFSETS, JUNCTION["inputs"])
+        sol = ms.solve(DURATIONS, JUNCTION["inputs"])
         self.assertEqual([k.set_aside.name for k in sol.conflicts], ["gm-in-seat to presale-launch"])
 
     def test_permit_review_follows_submission(self):
@@ -97,18 +97,18 @@ class TestResolve(unittest.TestCase):
     def test_delivery_is_an_input_every_site_must_give(self):
         inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "landlord-delivery"}
         with self.assertRaises(ValueError):
-            ms.resolve(OFFSETS, inputs)
+            ms.resolve(DURATIONS, inputs)
 
     def test_earlier_delivery_changes_nothing_and_later_delivery_moves_the_build(self):
-        early = ms.resolve(OFFSETS, dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 1, 15)}))
+        early = ms.resolve(DURATIONS, dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 1, 15)}))
         self.assertEqual(early["construction-start"], junction()["construction-start"])
         self.assertEqual(early["soft-open"], junction()["soft-open"])
-        late = ms.resolve(OFFSETS, dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 2, 12)}))
+        late = ms.resolve(DURATIONS, dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 2, 12)}))
         self.assertEqual(late["construction-start"], (D(2027, 2, 12), D(2027, 2, 18)))
 
     def test_construction_waits_for_the_later_of_delivery_and_permits(self):
         late = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 3, 1)})
-        self.assertEqual(ms.resolve(OFFSETS, late)["construction-start"], (D(2027, 3, 1), D(2027, 3, 1)))
+        self.assertEqual(ms.resolve(DURATIONS, late)["construction-start"], (D(2027, 3, 1), D(2027, 3, 1)))
         self.assertEqual(junction()["construction-start"][0], D(2027, 2, 8))
 
     def test_template_gaps_from_construction_start(self):
@@ -116,7 +116,7 @@ class TestResolve(unittest.TestCase):
         start = D(2026, 11, 18)
         inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": start,
                                              "permits-received": D(2026, 10, 1)})
-        r = ms.resolve(OFFSETS, inputs)
+        r = ms.resolve(DURATIONS, inputs)
         self.assertEqual(r["lighting-flooring"][0], D(2026, 12, 30))
         self.assertEqual(r["equipment-delivered"][0], D(2027, 2, 17))
         self.assertEqual(r["build-complete"][0], D(2027, 3, 3))
@@ -130,7 +130,7 @@ class TestResolve(unittest.TestCase):
         inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "permits-submitted"}
         # 60 days after the latest lease is 2/13, but soft open must stay within 180 days of the
         # latest launch, and that pulls the latest submission back to 1/2.
-        self.assertEqual(ms.resolve(OFFSETS, inputs)["permits-submitted"], (D(2026, 11, 30), D(2027, 1, 2)))
+        self.assertEqual(ms.resolve(DURATIONS, inputs)["permits-submitted"], (D(2026, 11, 30), D(2027, 1, 2)))
 
     def test_site_fixed_submission_narrows_the_lease_backward(self):
         # Submission fixed on 12/14 within 0 to 60 days of the lease means the lease is signed by 12/14.
@@ -146,32 +146,32 @@ class TestResolve(unittest.TestCase):
         # Kickoff 10/14 gives VIP 10/28 to 10/31 and launch 12/09 to 12/26 from the durations alone.
         # Launch can only be met by the GM at 12/25 or later, so the requirement trims both ranges.
         inputs = dict(JUNCTION["inputs"], **{"presale-kickoff": D(2026, 10, 14)})
-        s = ms.solve(OFFSETS, inputs)
+        s = ms.solve(DURATIONS, inputs)
         self.assertEqual(s.ranges["vip-start"], (D(2026, 10, 30), D(2026, 10, 31)))
         self.assertEqual(s.ranges["presale-launch"], (D(2026, 12, 25), D(2026, 12, 26)))
         self.assertEqual(s.conflicts, [])
 
     def test_site_fixed_date_replaces_the_estimates(self):
         inputs = dict(JUNCTION["inputs"], **{"presale-launch": D(2026, 12, 14)})
-        r = ms.resolve(OFFSETS, inputs)
+        r = ms.resolve(DURATIONS, inputs)
         self.assertEqual(r["presale-launch"], (D(2026, 12, 14), D(2026, 12, 14)))
 
     def test_input_for_a_computed_row_is_ignored(self):
         inputs = dict(JUNCTION["inputs"], **{"soft-open": D(2027, 1, 1)})
-        self.assertEqual(ms.resolve(OFFSETS, inputs)["soft-open"], junction()["soft-open"])
+        self.assertEqual(ms.resolve(DURATIONS, inputs)["soft-open"], junction()["soft-open"])
 
     def test_delivery_slip_moves_soft_open(self):
         inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 5, 1)})
-        self.assertEqual(ms.resolve(OFFSETS, inputs)["soft-open"][0], D(2027, 8, 21))
+        self.assertEqual(ms.resolve(DURATIONS, inputs)["soft-open"][0], D(2027, 8, 21))
 
     def test_slipping_sourcing_moves_the_gm(self):
         inputs = dict(JUNCTION["inputs"], **{"gm-sourcing": D(2026, 10, 12)})
-        self.assertEqual(ms.resolve(OFFSETS, inputs)["gm-in-seat"][0], D(2026, 12, 10))
+        self.assertEqual(ms.resolve(DURATIONS, inputs)["gm-in-seat"][0], D(2026, 12, 10))
 
     def test_missing_input_is_an_error(self):
         inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "presale-kickoff"}
         with self.assertRaises(ValueError):
-            ms.resolve(OFFSETS, inputs)
+            ms.resolve(DURATIONS, inputs)
 
     def test_unbounded_event_is_an_error(self):
         lone = synthetic([c("a", "b", 1, 2)], ["a", "b", "orphan"], a=1)
@@ -222,7 +222,7 @@ class TestConstraintModel(unittest.TestCase):
         self.assertEqual(len(s.conflicts), 1)
 
     def test_junction_gm_preference_misses_its_ideal_because_of_the_fibr_estimate(self):
-        s = ms.solve(OFFSETS, JUNCTION["inputs"])
+        s = ms.solve(DURATIONS, JUNCTION["inputs"])
         self.assertEqual(len(s.conflicts), 1)
         k = s.conflicts[0]
         self.assertEqual(k.short, 4)
@@ -237,7 +237,7 @@ class TestConstraintModel(unittest.TestCase):
             self.assertIn(date, k.message)
 
     def test_conflict_shows_the_estimates_without_the_requirement(self):
-        s = ms.solve(OFFSETS, JUNCTION["inputs"])
+        s = ms.solve(DURATIONS, JUNCTION["inputs"])
         self.assertEqual(s.ranges["presale-launch"], (D(2026, 12, 4), D(2026, 12, 21)))
         self.assertEqual(s.ranges["gm-in-seat"], (D(2026, 12, 4), D(2026, 12, 18)))
 
@@ -256,7 +256,7 @@ class TestConstraintModel(unittest.TestCase):
 
     def test_requirement_met_means_no_conflict(self):
         inputs = dict(JUNCTION["inputs"], **{"gm-sourcing": D(2026, 10, 2)})
-        self.assertEqual(ms.solve(OFFSETS, inputs).conflicts, [])
+        self.assertEqual(ms.solve(DURATIONS, inputs).conflicts, [])
 
     def test_two_estimates_collide_and_the_one_listed_last_gives(self):
         off = synthetic([c("a", "b", 10, 10), c("a", "b", 20, 20)], ["a", "b"], a=1)
@@ -273,7 +273,7 @@ class TestConstraintModel(unittest.TestCase):
 
     def test_delivery_slip_collides_with_the_sales_window(self):
         inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 5, 1)})
-        s = ms.solve(OFFSETS, inputs)
+        s = ms.solve(DURATIONS, inputs)
         self.assertIn("presale-membership-sales", [k.set_aside.name for k in s.conflicts])
         self.assertEqual(s.ranges["presale-launch"], junction()["presale-launch"])
         self.assertIn("presale-membership-sales", s.set_aside_phases)
@@ -320,7 +320,7 @@ class TestFlags(unittest.TestCase):
 
 class TestConflictFlags(unittest.TestCase):
     def test_flag_names_both_constraints_and_the_days(self):
-        s = ms.solve(OFFSETS, JUNCTION["inputs"])
+        s = ms.solve(DURATIONS, JUNCTION["inputs"])
         key, msg = s.conflicts[0].key, s.conflicts[0].message
         self.assertEqual(key, "presale-launch")
         self.assertIn("gm-in-seat to presale-launch", msg)
@@ -330,7 +330,7 @@ class TestConflictFlags(unittest.TestCase):
 
 class TestInputsTable(unittest.TestCase):
     def rows(self, site=JUNCTION):
-        return ms.render_inputs(OFFSETS, site).splitlines()[2:]
+        return ms.render_inputs(DURATIONS, site).splitlines()[2:]
 
     def test_lists_every_date_the_site_gives_with_its_status(self):
         rows = self.rows()
@@ -342,7 +342,7 @@ class TestInputsTable(unittest.TestCase):
 
     def test_rows_follow_milestone_order(self):
         keys = [r.split("`")[1] for r in self.rows()]
-        order = [m["key"] for m in OFFSETS["milestones"]]
+        order = [m["key"] for m in DURATIONS["milestones"]]
         self.assertEqual(keys, sorted(keys, key=order.index))
 
     def test_site_basis_replaces_the_default(self):
@@ -352,17 +352,17 @@ class TestInputsTable(unittest.TestCase):
     def test_a_date_without_a_status_is_an_error(self):
         site = dict(JUNCTION, status={k: v for k, v in JUNCTION["status"].items() if k != "landlord-delivery"})
         with self.assertRaises(ValueError):
-            ms.render_inputs(OFFSETS, site)
+            ms.render_inputs(DURATIONS, site)
 
     def test_unknown_status_is_an_error(self):
         site = dict(JUNCTION, status=dict(JUNCTION["status"], **{"lease-signed": "hoped"}))
         with self.assertRaises(ValueError):
-            ms.render_inputs(OFFSETS, site)
+            ms.render_inputs(DURATIONS, site)
 
 
 class TestSetAsideTable(unittest.TestCase):
     def test_lists_the_preference_set_aside_and_what_it_collides_with(self):
-        table = ms.render_set_aside(ms.solve(OFFSETS, JUNCTION["inputs"]).conflicts)
+        table = ms.render_set_aside(ms.solve(DURATIONS, JUNCTION["inputs"]).conflicts)
         row = table.splitlines()[2]
         self.assertTrue(row.startswith("| `gm-in-seat to presale-launch` | preference |"))
         self.assertIn("`gm-sourcing to gm-offer-accepted`", row)
@@ -371,27 +371,27 @@ class TestSetAsideTable(unittest.TestCase):
 
     def test_rows_follow_the_order_ignored(self):
         inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 5, 1)})
-        rows = ms.render_set_aside(ms.solve(OFFSETS, inputs).conflicts).splitlines()[2:]
+        rows = ms.render_set_aside(ms.solve(DURATIONS, inputs).conflicts).splitlines()[2:]
         self.assertEqual(len(rows), 2)
         self.assertIn("presale-membership-sales", rows[0])
 
 
 class TestPhaseFlags(unittest.TestCase):
     def messages(self, inputs=None):
-        s = ms.solve(OFFSETS, dict(JUNCTION["inputs"], **(inputs or {})))
-        return dict(ms.phase_flags(OFFSETS, s.ranges, s.set_aside_phases)), s.ranges
+        s = ms.solve(DURATIONS, dict(JUNCTION["inputs"], **(inputs or {})))
+        return dict(ms.phase_flags(DURATIONS, s.ranges, s.set_aside_phases)), s.ranges
 
     def test_junction_sales_window_is_inside_four_to_six_months(self):
         m, _ = self.messages()
         self.assertNotIn("soft-open", m)
 
     def test_soft_open_too_long_after_launch_is_a_conflict_not_a_phase_flag(self):
-        s = ms.solve(OFFSETS, dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 6, 1)}))
+        s = ms.solve(DURATIONS, dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 6, 1)}))
         messages = [k.message for k in s.conflicts if k.set_aside.phase == "presale-membership-sales"]
         self.assertEqual(len(messages), 1)
         self.assertIn("improve by 94 days in total", messages[0])
         self.assertIn("landlord-delivery to construction-start", messages[0])
-        self.assertNotIn("soft-open", dict(ms.phase_flags(OFFSETS, s.ranges, s.set_aside_phases)))
+        self.assertNotIn("soft-open", dict(ms.phase_flags(DURATIONS, s.ranges, s.set_aside_phases)))
 
     def test_derived_phases_are_clean(self):
         m, _ = self.messages()
@@ -404,7 +404,7 @@ class TestPhaseFlags(unittest.TestCase):
         self.assertNotIn("soft-open", m)
 
     def test_soft_open_too_soon_after_launch_is_a_conflict(self):
-        s = ms.solve(OFFSETS, dict(JUNCTION["inputs"], **{"presale-launch": D(2027, 6, 1)}))
+        s = ms.solve(DURATIONS, dict(JUNCTION["inputs"], **{"presale-launch": D(2027, 6, 1)}))
         self.assertIn("presale-membership-sales", [k.set_aside.name for k in s.conflicts])
 
     def test_site_fixed_launch_outside_the_range_is_flagged(self):
@@ -414,8 +414,8 @@ class TestPhaseFlags(unittest.TestCase):
 
     def test_phase_table_lists_every_phase(self):
         _, r = self.messages()
-        table = ms.render_phases(OFFSETS, r)
-        for p in OFFSETS["phases"]:
+        table = ms.render_phases(DURATIONS, r)
+        for p in DURATIONS["phases"]:
             self.assertIn(f"`{p['key']}`", table)
         self.assertIn("`permit-review`", table)
         self.assertIn("171 to 178 days", table)
@@ -423,12 +423,12 @@ class TestPhaseFlags(unittest.TestCase):
 
 class TestRender(unittest.TestCase):
     def test_table_keeps_keys_and_order(self):
-        table = ms.render_table(OFFSETS, junction(), JUNCTION["basis"])
+        table = ms.render_table(DURATIONS, junction(), JUNCTION["basis"])
         keys = [line.split("`")[1] for line in table.splitlines()[2:]]
-        self.assertEqual(keys, [m["key"] for m in OFFSETS["milestones"]])
+        self.assertEqual(keys, [m["key"] for m in DURATIONS["milestones"]])
 
     def test_site_basis_overrides_default(self):
-        table = ms.render_table(OFFSETS, junction(), JUNCTION["basis"])
+        table = ms.render_table(DURATIONS, junction(), JUNCTION["basis"])
         self.assertIn("45 to 60 days", table)
 
     def test_point_and_range_formats(self):

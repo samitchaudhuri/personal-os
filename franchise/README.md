@@ -8,7 +8,7 @@ It sits next to `presentations/` as another domain tooling umbrella: franchise t
 
 `site-selection/` builds the site comparison workbook from VisionTrack inputs and hand-entered facts. The stable method is in the vault at `Agent/Workflows/Site Selection Scoring.md`.
 
-`milestones/` computes each site's milestone dates from one offsets file and flags estimates that pass a contract date. Its README has the method.
+`milestones/` computes each site's milestone dates from one durations file and flags estimates that pass a contract date. Its README has the method.
 
 `ulc-business-plan/` merges staging markdown into the lender business plan template. The runbook is in the vault at `Notes/ULC Business Plan Runbook.md`.
 

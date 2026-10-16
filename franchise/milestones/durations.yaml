@@ -2,7 +2,7 @@
 # minus from is within [lo, hi] days", and the range can be negative, such as -21
 # for three weeks before. Keys are the stable names that goals and targets link to
 # in the vault; never rename one without updating those links.
-# gantt_row is the row in `ULC Center Opening Timeline.xlsx`, blank where the
+# gantt_row is the row in `ULC Los Gatos Opening Timeline.xlsx`, blank where the
 # template has no bar. `span_from` names a milestone where the row's bar starts, so the
 # Gantt row runs from that milestone to this one, such as GM sourcing to the accepted offer.
 #

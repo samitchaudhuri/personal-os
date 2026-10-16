@@ -10,9 +10,9 @@ sheet starts B2 plus seven days times its week number, so dates come from the
 anchor date in B2 and not from the formula cells, which hold no cached values
 after a script saves the file. A bar's end is the last day of its last week.
 
-With --site, rows that offsets.yaml maps to a milestone carry that milestone's key in brackets after its name and the
+With --site, rows that durations.yaml maps to a milestone carry that milestone's key in brackets after its name and the
 generator's earliest and latest dates for the site as start and end. The template's bar dates
-are sample_start and sample_end. The duration column is the days from start to end, and the constraint column lists the offsets.yaml rules
+are sample_start and sample_end. The duration column is the days from start to end, and the constraint column lists the durations.yaml rules
 that touch the milestone, as in '45 days after 32', plus any proposed predecessor no rule covers. Rows the generator does not cover leave start and end blank.
 
 With --teamgantt, the CSV takes TeamGantt's work breakdown structure layout
@@ -215,10 +215,10 @@ def renumber(rows):
     return rows
 
 
-def milestone_ids(offsets):
+def milestone_ids(durations):
     """Map each milestone key to its CSV id: the Gantt row for the first milestone on a row, then 32.1, 32.2."""
     ids, seen = {}, {}
-    for m in offsets["milestones"]:
+    for m in durations["milestones"]:
         row = m.get("gantt_row")
         if not row:
             continue
@@ -231,14 +231,14 @@ def milestone_rules():
     """Map each milestone key to the generator rules that date it, as (text, rows it comes after).
 
     A rule reads '45 days after <<32>>' on the later milestone only, where <<32>> stands for the id of the
-    earlier one and build_rows swaps in its final number, from offsets.yaml. A milestone with no Gantt row is named by its key, a range reads
+    earlier one and build_rows swaps in its final number, from durations.yaml. A milestone with no Gantt row is named by its key, a range reads
     '14-28 days', a rule from the milestone where the row starts is left out because the duration shows it, and a not-before rule reads 'at least 10 days'.
     """
-    offsets = ms.load_yaml("offsets.yaml")
-    ids = milestone_ids(offsets)
-    span_from = {m["key"]: m["span_from"] for m in offsets["milestones"] if m.get("span_from")}
+    durations = ms.load_yaml("durations.yaml")
+    ids = milestone_ids(durations)
+    span_from = {m["key"]: m["span_from"] for m in durations["milestones"] if m.get("span_from")}
     out = {}
-    for c in ms.constraints_of(offsets):
+    for c in ms.constraints_of(durations):
         span = (f"at least {c.lo} days" if c.hi is None else f"{c.lo} days" if c.hi == c.lo
                 else f"{c.lo}-{c.hi} days")
         frm = ids.get(c.frm)
@@ -251,13 +251,13 @@ def milestone_rules():
 
 
 def site_estimates(site):
-    """Map each Gantt row to the milestone offsets.yaml ties to it, with the site's estimate."""
-    offsets, sites = ms.load_yaml("offsets.yaml"), ms.load_yaml("sites.yaml")
+    """Map each Gantt row to the milestone durations.yaml ties to it, with the site's estimate."""
+    durations, sites = ms.load_yaml("durations.yaml"), ms.load_yaml("sites.yaml")
     if site not in sites["sites"]:
         raise SystemExit(f"no site {site!r} in sites.yaml; have {', '.join(sites['sites'])}")
-    resolved = ms.resolve(offsets, sites["sites"][site]["inputs"])
+    resolved = ms.resolve(durations, sites["sites"][site]["inputs"])
     out = {}
-    for m in offsets["milestones"]:
+    for m in durations["milestones"]:
         row = m.get("gantt_row")
         if row and row not in out:
             lo, hi = resolved[m["key"]]
@@ -269,10 +269,10 @@ def site_estimates(site):
 
 def extra_milestones(site):
     """Map a Gantt row to its second and later milestones, as (id, key, label, (earliest, latest))."""
-    offsets, sites = ms.load_yaml("offsets.yaml"), ms.load_yaml("sites.yaml")
-    resolved = ms.resolve(offsets, sites["sites"][site]["inputs"])
-    ids, first, out = milestone_ids(offsets), {}, {}
-    for m in offsets["milestones"]:
+    durations, sites = ms.load_yaml("durations.yaml"), ms.load_yaml("sites.yaml")
+    resolved = ms.resolve(durations, sites["sites"][site]["inputs"])
+    ids, first, out = milestone_ids(durations), {}, {}
+    for m in durations["milestones"]:
         row = m.get("gantt_row")
         if not row:
             continue

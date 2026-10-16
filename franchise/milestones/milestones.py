@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compute a site's milestone dates from offsets.yaml and sites.yaml.
+"""Compute a site's milestone dates from durations.yaml and sites.yaml.
 
 Every milestone is a date range. Inputs come from sites.yaml, and each other
 milestone sits a duration range from one it names, or from the latest of several
@@ -108,13 +108,13 @@ def ordinal(d):
     return d.toordinal()
 
 
-def constraints_of(offsets):
+def constraints_of(durations):
     """Rules from the `constraints` list, then the phases, in file order."""
-    keys = {m["key"] for m in offsets["milestones"]}
+    keys = {m["key"] for m in durations["milestones"]}
     out = []
-    rows = [dict(c, name=c.get("name")) for c in offsets.get("constraints", [])]
+    rows = [dict(c, name=c.get("name")) for c in durations.get("constraints", [])]
     rows += [dict(from_=p["start"], to=p["end"], duration_days=p["duration_days"], kind=p["kind"],
-                  name=p["key"], phase=p["key"]) for p in offsets.get("phases", [])]
+                  name=p["key"], phase=p["key"]) for p in durations.get("phases", [])]
     for i, c in enumerate(rows):
         frm = c.get("from_") or c["from"]
         lo, hi = c["duration_days"]
@@ -312,11 +312,11 @@ def pick_set_aside(cons, cycle):
     return max(cons, key=lambda c: c.order)
 
 
-def solve(offsets, inputs):
+def solve(durations, inputs):
     """Return a Solution: displayed ranges as dates, and the conflicts that were flagged."""
-    rows = {m["key"]: m for m in offsets["milestones"]}
+    rows = {m["key"]: m for m in durations["milestones"]}
     fixed, site_fixed = fixed_ordinals(rows, inputs)
-    active = [c for c in constraints_of(offsets)
+    active = [c for c in constraints_of(durations)
               if not (c.to in site_fixed and c.kind == "estimate")]
     conflicts, set_aside_phases = [], set()
     while True:
@@ -334,9 +334,9 @@ def solve(offsets, inputs):
     return Solution(ranges, conflicts, set_aside_phases)
 
 
-def resolve(offsets, inputs):
-    """Return {key: (earliest, latest)} for every milestone in offsets."""
-    return solve(offsets, inputs).ranges
+def resolve(durations, inputs):
+    """Return {key: (earliest, latest)} for every milestone in durations."""
+    return solve(durations, inputs).ranges
 
 
 def add_months(d, n):
@@ -395,10 +395,10 @@ def days(lo, hi):
     return f"{lo} days" if lo == hi else f"{lo} to {hi} days"
 
 
-def phase_flags(offsets, resolved, skip=()):
+def phase_flags(durations, resolved, skip=()):
     """Return [(end_key, message)] for phases whose actual span is outside the planned range."""
     out = []
-    for p in offsets.get("phases", []):
+    for p in durations.get("phases", []):
         if p["key"] in skip:
             continue
         lo, hi = p["duration_days"]
@@ -411,10 +411,10 @@ def phase_flags(offsets, resolved, skip=()):
     return out
 
 
-def render_phases(offsets, resolved):
+def render_phases(durations, resolved):
     lines = ["| Phase | From | To | Planned | Actual | Basis |",
              "| ----- | ---- | -- | ------- | ------ | ----- |"]
-    for p in offsets.get("phases", []):
+    for p in durations.get("phases", []):
         lo, hi = p["duration_days"]
         actual = days(*phase_pairing(p, resolved))
         lines.append(f"| `{p['key']}` | `{p['start']}` | `{p['end']}` | {days(lo, hi)} | {actual} | {p['basis']} |")
@@ -434,11 +434,11 @@ def render_set_aside(conflicts):
 STATUSES = ("committed", "estimated", "assumed")
 
 
-def render_inputs(offsets, site):
+def render_inputs(durations, site):
     """Table of every date the site gives, with its status and basis, in milestone order."""
     basis, status = site.get("basis", {}), site.get("status", {})
     lines = ["| Input | Date | Status | Basis |", "| ----- | ---- | ------ | ----- |"]
-    for m in offsets["milestones"]:
+    for m in durations["milestones"]:
         key = m["key"]
         if key not in site["inputs"]:
             continue
@@ -453,11 +453,11 @@ def fmt(rng):
     return lo.isoformat() if lo == hi else f"{lo.isoformat()} to {hi.isoformat()}"
 
 
-def render_table(offsets, resolved, site_basis=None):
+def render_table(durations, resolved, site_basis=None):
     site_basis = site_basis or {}
     lines = ["| Key | Milestone | Estimate | Gantt row | Basis |",
              "| --- | --------- | -------- | --------- | ----- |"]
-    for m in offsets["milestones"]:
+    for m in durations["milestones"]:
         key = m["key"]
         row = m.get("gantt_row") or ""
         basis = site_basis.get(key, m["basis"])
@@ -483,15 +483,15 @@ def main(argv=None):
     ap.add_argument("--write", metavar="NOTE", help="rewrite the site's marked block in this note")
     args = ap.parse_args(argv)
 
-    offsets, sites = load_yaml("offsets.yaml"), load_yaml("sites.yaml")
+    durations, sites = load_yaml("durations.yaml"), load_yaml("sites.yaml")
     if args.site not in sites["sites"]:
         raise SystemExit(f"no site {args.site!r} in sites.yaml; have {', '.join(sites['sites'])}")
     site = sites["sites"][args.site]
-    solution = solve(offsets, site["inputs"])
+    solution = solve(durations, site["inputs"])
     resolved = solution.ranges
-    table = render_inputs(offsets, site) + "\n\n" + render_table(offsets, resolved, site.get("basis"))
-    if offsets.get("phases"):
-        table += "\n\n" + render_phases(offsets, resolved)
+    table = render_inputs(durations, site) + "\n\n" + render_table(durations, resolved, site.get("basis"))
+    if durations.get("phases"):
+        table += "\n\n" + render_phases(durations, resolved)
     if solution.conflicts:
         table += "\n\n" + render_set_aside(solution.conflicts)
     if args.write:
@@ -501,7 +501,7 @@ def main(argv=None):
         print(table)
     for key, msg in ([(c.key, c.message) for c in solution.conflicts if not c.soft]
                      + flags(resolved, site["limits"], sites["owner"]["away"])
-                     + phase_flags(offsets, resolved, solution.set_aside_phases)):
+                     + phase_flags(durations, resolved, solution.set_aside_phases)):
         print(f"flag: {key}: {msg}", file=sys.stderr)
     for c in solution.conflicts:
         if c.soft:
