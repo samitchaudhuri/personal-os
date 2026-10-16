@@ -102,6 +102,8 @@ class TestBuildRows(unittest.TestCase):
         r = tc.milestone_rules()
         self.assertNotIn("gm-offer-accepted", r)    # the row starts at gm-sourcing, so its duration says 45 days
         self.assertEqual(r["gm-in-seat"], [("14-28 days after <<32>>", [32])])
+        self.assertIn("21 days after <<32.1>> (ideal)", [t for t, _ in r["presale-launch"]])
+        self.assertFalse(any("(ideal)" in t for k in ("construction-start", "soft-open") for t, _ in r[k]))
         self.assertIn("at least 10 days after permits-received", [t for t, _ in r["construction-start"]])
         self.assertNotIn("lease-signed", r)
 
@@ -161,6 +163,27 @@ class TestBuildRows(unittest.TestCase):
         self.assertEqual(est[29][0], "equipment-delivered")
         self.assertNotIn("av-ordered", [k for k, _ in est.values()])
         self.assertNotIn("equipment-paid", [k for k, _ in est.values()])
+
+    def test_skip_list_is_workbook_rows_and_no_generator_dated_row_is_on_it(self):
+        dated = set(tc.site_estimates("junction"))
+        self.assertEqual(set(tc.SKIP_ROWS) & dated, set())
+        self.assertEqual(len(tc.SKIP_ROWS), 11)
+
+    def test_skipping_a_row_passes_its_predecessors_to_its_successors(self):
+        tasks = [{"row": r, "category": "g", "group": "G", "task": f"t{r}", "start": None, "end": None}
+                 for r in (7, 8, 9)]
+        deps = {7: {"after": []}, 8: {"after": [7]}, 9: {"after": [8]}}
+        kept, kept_deps = tc.drop_rows(tasks, deps, [8])
+        self.assertEqual([t["row"] for t in kept], [7, 9])
+        self.assertEqual(kept_deps[9]["after"], [7])
+
+    def test_plain_csv_numbers_the_kept_rows_one_to_n(self):
+        tasks = [{"row": r, "category": "g", "group": "G", "task": f"t{r}", "start": None, "end": None}
+                 for r in (7, 8, 9)]
+        deps = {8: {"after": [7]}, 9: {"after": [8]}}
+        kept, kept_deps = tc.drop_rows(tasks, deps, [7])
+        rows = tc.build_rows(tc.predecessor_first(kept, kept_deps), kept_deps)
+        self.assertEqual([(r["id"], r["constraint"]) for r in rows], [(1, ""), (2, "after 1")])
 
 
 if __name__ == "__main__":

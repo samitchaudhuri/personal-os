@@ -8,7 +8,10 @@
 #
 # Each rule has `from`, `to`, `duration_days` [lo, hi] and a `kind`. An estimate is a
 # forecast of how long something takes, such as Fibr's 45 days. A requirement is
-# a duration somebody needs to hold, such as the GM sitting 3 weeks before launch. A
+# a duration somebody needs to hold, such as the lease signed within 60 days of the permits. A
+# preference is a duration somebody wants and would give up, such as Michelle Tomko's GM in
+# seat 3 weeks before launch. The generator dates from a preference like a requirement, but
+# a miss is an "ideal missed by N days" warning and not a collision. A
 # `duration_days` pair with hi null, such as [10, null], is a not-before rule: it sets the
 # earliest date and no latest date. A milestone with not-before rules starts as
 # soon as the latest of them allows, so its latest date is the latest of their
@@ -23,7 +26,7 @@
 # A milestone's range is the intersection of every rule that reaches it, and the
 # rules narrow both ends. When the rules cannot all hold, the generator flags the
 # collision and names the rules. It sets one rule aside to draw the dates: a
-# requirement if the collision has one, else the estimate listed last, so put the
+# preference if the collision has one, else a requirement, else the estimate listed last, so put the
 # checks last. A not-before rule is never set aside.
 #
 # A phase is a rule with a table row of its own, a key and a basis, and the
@@ -64,7 +67,7 @@ phases:
 constraints:
   - {from: gm-sourcing, to: gm-offer-accepted, duration_days: [45, 45], kind: estimate}
   - {from: gm-offer-accepted, to: gm-in-seat, duration_days: [14, 28], kind: estimate}
-  - {from: gm-in-seat, to: presale-launch, duration_days: [21, 21], kind: requirement}
+  - {from: gm-in-seat, to: presale-launch, duration_days: [21, 21], kind: preference}
   - {from: lease-signed, to: permits-submitted, duration_days: [0, 60], kind: requirement}
   - {from: landlord-delivery, to: construction-start, duration_days: [0, null], kind: requirement}
   - {from: permits-received, to: construction-start, duration_days: [10, null], kind: estimate}
@@ -107,7 +110,7 @@ milestones:
   - key: gm-in-seat
     label: GM in seat
     gantt_row: 32
-    basis: Two to four weeks of notice between the accepted offer and the start date, and Michelle Tomko requires the GM in seat 3 weeks before presale launch. Corporate reviews the GM's goals weekly
+    basis: Two to four weeks of notice between the accepted offer and the start date, and Michelle Tomko prefers the GM in seat 3 weeks before presale launch, which is an ideal and not a hard requirement. Corporate reviews the GM's goals weekly
 
   - key: construction-documents-complete
     label: Construction documents complete

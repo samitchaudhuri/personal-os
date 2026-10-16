@@ -221,7 +221,7 @@ class TestConstraintModel(unittest.TestCase):
         s = ms.solve(off, {"a": D(2026, 3, 1), "z": D(2026, 3, 1)})
         self.assertEqual(len(s.conflicts), 1)
 
-    def test_junction_gm_requirement_conflicts_with_the_fibr_estimate(self):
+    def test_junction_gm_preference_misses_its_ideal_because_of_the_fibr_estimate(self):
         s = ms.solve(OFFSETS, JUNCTION["inputs"])
         self.assertEqual(len(s.conflicts), 1)
         k = s.conflicts[0]
@@ -230,8 +230,9 @@ class TestConstraintModel(unittest.TestCase):
         names = {x.name for x in k.constraints}
         self.assertIn("gm-in-seat to presale-launch", names)
         self.assertIn("gm-sourcing to gm-offer-accepted", names)
-        self.assertIn("Requirement gm-in-seat to presale-launch is unmet unless the estimates", k.message)
-        self.assertIn("improve by 4 days in total", k.message)
+        self.assertTrue(k.soft)
+        self.assertIn("Ideal missed by 4 days: the preference gm-in-seat to presale-launch", k.message)
+        self.assertIn("improved by 4 days in total", k.message)
         for date in ("2026-12-21", "2026-11-30", "2026-11-16", "2026-11-20"):
             self.assertIn(date, k.message)
 
@@ -239,6 +240,19 @@ class TestConstraintModel(unittest.TestCase):
         s = ms.solve(OFFSETS, JUNCTION["inputs"])
         self.assertEqual(s.ranges["presale-launch"], (D(2026, 12, 4), D(2026, 12, 21)))
         self.assertEqual(s.ranges["gm-in-seat"], (D(2026, 12, 4), D(2026, 12, 18)))
+
+    def test_a_preference_gives_before_an_estimate_and_a_requirement_is_not_soft(self):
+        off = synthetic([c("a", "b", 10, 10), c("a", "b", 20, 20, "preference")], ["a", "b"], a=1)
+        s = ms.solve(off, {"a": D(2026, 1, 1)})
+        self.assertEqual([(k.set_aside.kind, k.soft) for k in s.conflicts], [("preference", True)])
+        hard = synthetic([c("a", "b", 10, 10), c("a", "b", 20, 20, "requirement")], ["a", "b"], a=1)
+        self.assertFalse(ms.solve(hard, {"a": D(2026, 1, 1)}).conflicts[0].soft)
+
+    def test_a_preference_that_holds_dates_like_a_requirement_and_raises_no_warning(self):
+        off = synthetic([c("gm", "launch", 21, 21, "preference")], ["gm", "launch"], gm=1)
+        s = ms.solve(off, {"gm": D(2026, 1, 1)})
+        self.assertEqual(s.conflicts, [])
+        self.assertEqual(s.ranges["launch"], (D(2026, 1, 22), D(2026, 1, 22)))
 
     def test_requirement_met_means_no_conflict(self):
         inputs = dict(JUNCTION["inputs"], **{"gm-sourcing": D(2026, 10, 2)})
@@ -347,10 +361,10 @@ class TestInputsTable(unittest.TestCase):
 
 
 class TestSetAsideTable(unittest.TestCase):
-    def test_lists_the_requirement_set_aside_and_what_it_collides_with(self):
+    def test_lists_the_preference_set_aside_and_what_it_collides_with(self):
         table = ms.render_set_aside(ms.solve(OFFSETS, JUNCTION["inputs"]).conflicts)
         row = table.splitlines()[2]
-        self.assertTrue(row.startswith("| `gm-in-seat to presale-launch` | requirement |"))
+        self.assertTrue(row.startswith("| `gm-in-seat to presale-launch` | preference |"))
         self.assertIn("`gm-sourcing to gm-offer-accepted`", row)
         self.assertNotIn("`gm-in-seat to presale-launch`", row.split("|")[4])
         self.assertTrue(row.endswith("| 4 |"))

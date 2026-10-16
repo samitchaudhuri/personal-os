@@ -17,8 +17,9 @@ that touch the milestone, as in '45 days after 32', plus any proposed predecesso
 
 With --teamgantt, the CSV takes TeamGantt's work breakdown structure layout
 instead: a WBS # column, where 1 is the project, 1.n a group and 1.n.m a task,
-and predecessors written as WBS numbers. TeamGantt's free plan holds 40 tasks,
-so --skip drops optional rows and hands their predecessors to their successors.
+and predecessors written as WBS numbers. TeamGantt's free plan holds 40 tasks.
+Both layouts drop the rows in SKIP_ROWS, or the rows named by --skip, and hand
+their predecessors to their successors.
 """
 from __future__ import annotations
 
@@ -43,6 +44,10 @@ NEUTRAL = {"FFF0EEE9", "FFFCFAF5", "FFFFFFFF"}
 OPENING_LINE = "FF2C2926"
 COLUMNS = ["id", "milestone", "department", "phase", "start", "end", "duration", "constraint",
            "sample_start", "sample_end", "sample_duration", "why"]
+
+# Workbook rows that are not milestones: ongoing activities and borderline setup tasks. Both exports drop
+# them unless --skip says otherwise, and their predecessors pass to their successors.
+SKIP_ROWS = [13, 21, 33, 35, 36, 37, 40, 42, 44, 47, 48]
 
 # The workbook's group names, shortened for the export.
 PHASE_NAMES = {"Site Selection & Legal": "Site Selection", "Lease, Design & Construction": "Lease, Design & Build"}
@@ -239,7 +244,9 @@ def milestone_rules():
         frm = ids.get(c.frm)
         if span_from.get(c.to) == c.frm:
             continue    # the row begins at that milestone, so its duration already says it
-        out.setdefault(c.to, []).append((f"{span} after " + (f"<<{frm}>>" if frm else c.frm), [frm] if frm else []))
+        mark = " (ideal)" if c.kind == "preference" else ""
+        out.setdefault(c.to, []).append((f"{span} after " + (f"<<{frm}>>" if frm else c.frm) + mark,
+                                         [frm] if frm else []))
     return out
 
 
@@ -337,7 +344,8 @@ def main(argv=None):
     ap.add_argument("--book", default=DEFAULT_BOOK, help="the opening timeline workbook")
     ap.add_argument("--site", help="add the generator's estimates for this site, such as junction")
     ap.add_argument("--teamgantt", action="store_true", help="write TeamGantt's WBS import layout")
-    ap.add_argument("--skip", default="", help="Gantt rows to drop, such as 13,33; used with --teamgantt")
+    ap.add_argument("--skip", default=",".join(map(str, SKIP_ROWS)),
+                    help="workbook rows to drop, such as 13,33; empty keeps every row (default: SKIP_ROWS)")
     ap.add_argument("--out", help="CSV path; prints to stdout when omitted")
     args = ap.parse_args(argv)
 
@@ -345,18 +353,19 @@ def main(argv=None):
     tasks = read_tasks(ws)
     deps = load_dependencies()
     check_dependencies(deps, [t["row"] for t in tasks])
-    if args.skip and not args.teamgantt:
-        ap.error("--skip is for --teamgantt")
+    skip = [int(r) for r in args.skip.split(",") if r.strip()]
+    kept, kept_deps = drop_rows(tasks, deps, skip)
     if args.teamgantt:
-        skip = [int(r) for r in args.skip.split(",") if r.strip()]
-        kept, kept_deps = drop_rows(tasks, deps, skip)
         rows, columns, count = build_teamgantt_rows(kept, kept_deps), TEAMGANTT_COLUMNS, len(kept)
         if count > TEAMGANTT_FREE_TASKS:
             print(f"warning: {count} tasks exceed TeamGantt's free limit of {TEAMGANTT_FREE_TASKS}",
                   file=sys.stderr)
     else:
         est = site_estimates(args.site) if args.site else None
-        rows = build_rows(predecessor_first(tasks, deps, est), deps, est, milestone_rules() if est else None,
+        dated = sorted(set(skip) & set(est or {}))
+        if dated:
+            raise SystemExit(f"--skip drops rows {dated} that the generator dates")
+        rows = build_rows(predecessor_first(kept, kept_deps, est), kept_deps, est, milestone_rules() if est else None,
                           extra_milestones(args.site) if est else None)
         columns, count = COLUMNS, len(rows)
     if args.out:
@@ -365,10 +374,10 @@ def main(argv=None):
         print(f"wrote {count} tasks to {args.out}")
     else:
         write_csv(rows, sys.stdout, columns)
-    for t in tasks:
+    for t in kept:
         if not t["start"]:
             print(f"warning: row {t['row']} {t['task']!r} has no bar", file=sys.stderr)
-    early = early_starts(tasks, deps)
+    early = early_starts(kept, kept_deps)
     if early:
         print(f"note: {len(early)} bars start before a proposed predecessor ends in the template, "
               f"such as row {early[0][0]} before row {early[0][1]}", file=sys.stderr)

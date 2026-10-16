@@ -45,7 +45,7 @@ def as_range(value):
     return (value, value)
 
 
-KINDS = ("estimate", "requirement")
+KINDS = ("estimate", "requirement", "preference")
 INF = float("inf")
 REF = "@"  # the reference node; a date is its ordinal day number
 
@@ -95,6 +95,10 @@ class Conflict:
     short: int
     set_aside: Constraint
     message: str
+
+    @property
+    def soft(self):
+        return self.set_aside.kind == "preference"
 
 
 Solution = namedtuple("Solution", "ranges conflicts set_aside_phases")
@@ -267,7 +271,14 @@ def describe(cycle):
     cons.sort(key=lambda c: c.order)
     reqs = [c.name for c in cons if c.kind == "requirement"]
     ests = [c.name for c in cons if c.kind == "estimate"]
-    if reqs and ests:
+    prefs = [c.name for c in cons if c.kind == "preference"]
+    if prefs:
+        others = reqs + ests
+        rules = "estimates" if not reqs else "rules"
+        head = (f"Ideal missed by {short} days: the preference {join(prefs)} would hold only if the "
+                f"{rules} {join(others)} improved by {short} days in total" if others else
+                f"Ideal missed by {short} days: the preference {join(prefs)} cannot hold with the fixed dates")
+    elif reqs and ests:
         head = (f"{'Requirement' if len(reqs) == 1 else 'Requirements'} {join(reqs)} "
                 f"{'is' if len(reqs) == 1 else 'are'} unmet unless the estimates {join(ests)} improve by {short} days in total")
     elif ests:
@@ -292,9 +303,9 @@ def describe(cycle):
 
 
 def pick_set_aside(cons, cycle):
-    """Choose the rule that gives: a requirement, else an estimate, the last listed first."""
+    """Choose the rule that gives: a preference, else a requirement, else an estimate, the last listed first."""
     can_give = [c for c in cons if not c.not_before]
-    for kind in ("requirement", "estimate"):
+    for kind in ("preference", "requirement", "estimate"):
         pool = [c for c in can_give if c.kind == kind]
         if pool:
             return max(pool, key=lambda c: c.order)
@@ -488,10 +499,13 @@ def main(argv=None):
         print(f"rewrote {args.site} block in {args.write}")
     else:
         print(table)
-    for key, msg in ([(c.key, c.message) for c in solution.conflicts]
+    for key, msg in ([(c.key, c.message) for c in solution.conflicts if not c.soft]
                      + flags(resolved, site["limits"], sites["owner"]["away"])
                      + phase_flags(offsets, resolved, solution.set_aside_phases)):
         print(f"flag: {key}: {msg}", file=sys.stderr)
+    for c in solution.conflicts:
+        if c.soft:
+            print(f"warning: {c.key}: {c.message}", file=sys.stderr)
 
 
 if __name__ == "__main__":
