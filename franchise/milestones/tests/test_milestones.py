@@ -53,34 +53,30 @@ class TestResolve(unittest.TestCase):
         r = junction()
         rg = lambda a, b: (D(*a), D(*b))
         self.assertEqual(r["construction-start"], rg((2027, 2, 8), (2027, 2, 18)))
-        self.assertEqual(r["lighting-flooring"], rg((2027, 3, 22), (2027, 4, 1)))
-        self.assertEqual(r["equipment-delivered"], rg((2027, 5, 10), (2027, 5, 20)))
+        self.assertEqual(r["lighting-flooring-delivered"], rg((2027, 3, 22), (2027, 4, 1)))
+        self.assertEqual(r["equipment-installed"], rg((2027, 5, 10), (2027, 5, 20)))
         self.assertEqual(r["av-ordered"], rg((2027, 2, 15), (2027, 2, 25)))
-        self.assertEqual(r["equipment-paid"], rg((2027, 4, 1), (2027, 4, 26)))
         self.assertEqual(r["equipment-ordered"], rg((2027, 4, 1), (2027, 4, 26)))
         self.assertEqual(r["build-complete"], rg((2027, 5, 24), (2027, 6, 3)))
         self.assertEqual(r["soft-open"], rg((2027, 5, 31), (2027, 6, 10)))
 
-    def test_equipment_is_paid_45_to_60_days_before_soft_open_and_ordered_after_payment(self):
+    def test_equipment_is_ordered_and_paid_45_to_60_days_before_soft_open(self):
         r = junction()
         soft_lo, soft_hi = r["soft-open"]
-        paid_lo, paid_hi = r["equipment-paid"]
-        self.assertEqual((soft_lo - paid_lo).days, 60)
-        self.assertEqual((soft_hi - paid_hi).days, 45)
-        self.assertGreaterEqual(r["equipment-ordered"][0], paid_lo)
-        self.assertLessEqual(r["equipment-ordered"][1], paid_hi)
+        ord_lo, ord_hi = r["equipment-ordered"]
+        self.assertEqual((soft_lo - ord_lo).days, 60)
+        self.assertEqual((soft_hi - ord_hi).days, 45)
+        self.assertNotIn("equipment-paid", r)
 
     def test_av_is_ordered_84_days_before_install_whatever_the_payment_date(self):
         r = junction()
-        self.assertEqual((r["equipment-delivered"][0] - r["av-ordered"][0]).days, 84)
-        self.assertLess(r["av-ordered"][1], r["equipment-paid"][0])
+        self.assertEqual((r["equipment-installed"][0] - r["av-ordered"][0]).days, 84)
+        self.assertLess(r["av-ordered"][1], r["equipment-ordered"][0])
 
-    def test_av_lead_time_is_an_estimate_and_payment_before_order_is_a_requirement(self):
+    def test_av_lead_time_and_equipment_timing_are_estimates(self):
         rules = {(x.frm, x.to): x for x in ms.constraints_of(DURATIONS)}
-        self.assertEqual(rules[("av-ordered", "equipment-delivered")].kind, "estimate")
-        self.assertEqual(rules[("equipment-paid", "soft-open")].kind, "estimate")
-        paid_first = rules[("equipment-paid", "equipment-ordered")]
-        self.assertEqual((paid_first.kind, paid_first.not_before), ("requirement", True))
+        self.assertEqual(rules[("equipment-installed", "av-ordered")].kind, "estimate")
+        self.assertEqual(rules[("soft-open", "equipment-ordered")].kind, "estimate")
 
     def test_new_equipment_milestones_add_no_flags_or_collisions(self):
         sol = ms.solve(DURATIONS, JUNCTION["inputs"])
@@ -117,8 +113,8 @@ class TestResolve(unittest.TestCase):
         inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": start,
                                              "permits-received": D(2026, 10, 1)})
         r = ms.resolve(DURATIONS, inputs)
-        self.assertEqual(r["lighting-flooring"][0], D(2026, 12, 30))
-        self.assertEqual(r["equipment-delivered"][0], D(2027, 2, 17))
+        self.assertEqual(r["lighting-flooring-delivered"][0], D(2026, 12, 30))
+        self.assertEqual(r["equipment-installed"][0], D(2027, 2, 17))
         self.assertEqual(r["build-complete"][0], D(2027, 3, 3))
         self.assertEqual(r["soft-open"][0], D(2027, 3, 10))
 

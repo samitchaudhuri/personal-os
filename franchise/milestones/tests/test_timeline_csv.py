@@ -95,17 +95,35 @@ class TestBuildRows(unittest.TestCase):
         est = {7: ("some-key", (D(2026, 8, 1), D(2026, 8, 5)))}
         rows = tc.build_rows(tasks, deps, est)
         self.assertEqual(rows[0]["sample_duration"], 21)
-        self.assertEqual((rows[0]["milestone"], rows[0]["start"]), ("First task (some-key)", "2026-08-01"))
-        self.assertEqual((rows[1]["constraint"], rows[1]["start"], rows[1]["sample_start"]), ("after 1", "", ""))
+        self.assertEqual((rows[0]["milestone"], rows[0]["key"], rows[0]["sample_row"]), ("First task", "some-key", 7))
+        self.assertEqual((rows[0]["milestone"], rows[0]["start"]), ("First task", "2026-08-01"))
+        self.assertEqual((rows[1]["rule"], rows[1]["start"], rows[1]["sample_start"]), ("after 1", "", ""))
 
     def test_constraint_reads_as_a_duration_after_an_earlier_row(self):
         r = tc.milestone_rules()
         self.assertNotIn("gm-offer-accepted", r)    # the row starts at gm-sourcing, so its duration says 45 days
-        self.assertEqual(r["gm-in-seat"], [("14-28 days after <<32>>", [32])])
-        self.assertIn("21 days after <<32.1>> (ideal)", [t for t, _ in r["presale-launch"]])
-        self.assertFalse(any("(ideal)" in t for k in ("construction-start", "soft-open") for t, _ in r[k]))
-        self.assertIn("at least 10 days after permits-received", [t for t, _ in r["construction-start"]])
+        self.assertEqual(r["gm-in-seat"], [("14-28 days after <<32>>", [32], "estimate")])
+        self.assertIn(("21 days after <<32.1>>", "preference"), [(t, k) for t, _, k in r["presale-launch"]])
+        self.assertFalse(any(k == "preference" for key in ("construction-start", "soft-open") for _, _, k in r[key]))
+        self.assertIn("at least 10 days after <<26.1>>", [t for t, _, _ in r["construction-start"]])
+        self.assertIn("on or after <<26.2>>", [t for t, _, _ in r["construction-start"]])
         self.assertNotIn("lease-signed", r)
+
+    def test_order_rules_read_before_the_milestone_they_feed(self):
+        r = tc.milestone_rules()
+        texts = [t for t, _, _ in r["equipment-ordered"]]
+        self.assertEqual(len(texts), 1)
+        self.assertRegex(texts[0], r"^45-60 days before <<\d+>>$")
+        self.assertEqual(r["equipment-ordered"][0][1], [])
+        self.assertRegex([t for t, _, _ in r["av-ordered"]][0], r"^84 days before <<")
+
+    def test_compact_keeps_before_rules_apart_from_after_rules(self):
+        rows = [{"id": 1, "rule": ""}, {"id": 2, "rule": "45 days after <<1>>; 3 days before <<1>>; after <<1>>"}]
+        self.assertEqual(tc.renumber(rows)[1]["rule"], "after 1; 45 days after 1; 3 days before 1")
+
+    def test_short_names_drop_side_notes(self):
+        self.assertEqual(tc.short_name("Equipment ordered (A/V = 12-wk lead time)"), "Equipment ordered")
+        self.assertEqual(tc.short_name("CENTER OPENING DAY  \u25c6"), "CENTER OPENING DAY \u25c6")
 
     def test_a_second_milestone_on_a_row_gets_its_own_row(self):
         ex = tc.extra_milestones("junction")
@@ -116,11 +134,18 @@ class TestBuildRows(unittest.TestCase):
         self.assertEqual((est[0], est[1][0], est[1][1]), ("gm-offer-accepted", D(2026, 10, 6), D(2026, 11, 20)))
 
     def test_rows_are_numbered_in_order_and_references_follow(self):
-        rows = [{"id": 7, "constraint": ""}, {"id": "32.1", "constraint": "5 days after <<7>>"},
-                {"id": 9, "constraint": "after <<32.1>>; 3 days after key"}]
+        rows = [{"id": 7, "rule": ""}, {"id": "32.1", "rule": "5 days after <<7>>"},
+                {"id": 9, "rule": "after <<32.1>>; 3 days after key"}]
         out = tc.renumber(rows)
-        self.assertEqual([(r["id"], r["constraint"]) for r in out],
+        self.assertEqual([(r["id"], r["rule"]) for r in out],
                          [(1, ""), (2, "5 days after 1"), (3, "after 2; 3 days after key")])
+
+    def test_rules_are_merged_and_sorted(self):
+        rows = [{"id": i, "rule": ""} for i in range(1, 17)]
+        rows.append({"id": 17, "rule": "at least 10 days after permits-received; after <<16>>; after <<15>>; at least 10 days after <<3>>; 2 days after <<9>>; 2 days after <<4>>",
+                     "preference": ""})
+        self.assertEqual(tc.renumber(rows)[-1]["rule"],
+                         "after 15, 16; at least 10 days after 3, permits-received; 2 days after 4, 9")
 
     def test_duration_is_the_days_from_start_to_end(self):
         tasks = tc.read_tasks(book())
@@ -157,11 +182,11 @@ class TestBuildRows(unittest.TestCase):
                  {"row": 3, "category": "a", "start": D(2026, 2, 1)}]
         self.assertEqual([t["row"] for t in tc.predecessor_first(tasks, {})], [3, 1, 2])
 
-    def test_row_25_stays_on_equipment_ordered_and_new_equipment_milestones_have_no_row(self):
+    def test_row_25_stays_on_equipment_ordered_and_av_ordered_follows_it(self):
         est = tc.site_estimates("junction")
         self.assertEqual(est[25][0], "equipment-ordered")
-        self.assertEqual(est[29][0], "equipment-delivered")
-        self.assertNotIn("av-ordered", [k for k, _ in est.values()])
+        self.assertEqual(est[29][0], "equipment-installed")
+        self.assertEqual(tc.milestone_ids(tc.ms.load_yaml("durations.yaml"))["av-ordered"], "25.1")
         self.assertNotIn("equipment-paid", [k for k, _ in est.values()])
 
     def test_skip_list_is_workbook_rows_and_no_generator_dated_row_is_on_it(self):
@@ -183,7 +208,7 @@ class TestBuildRows(unittest.TestCase):
         deps = {8: {"after": [7]}, 9: {"after": [8]}}
         kept, kept_deps = tc.drop_rows(tasks, deps, [7])
         rows = tc.build_rows(tc.predecessor_first(kept, kept_deps), kept_deps)
-        self.assertEqual([(r["id"], r["constraint"]) for r in rows], [(1, ""), (2, "after 1")])
+        self.assertEqual([(r["id"], r["rule"]) for r in rows], [(1, ""), (2, "after 1")])
 
 
 if __name__ == "__main__":
