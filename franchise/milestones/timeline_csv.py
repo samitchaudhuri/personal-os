@@ -29,6 +29,7 @@ import datetime
 import os
 import re
 import sys
+from pathlib import Path
 
 import openpyxl
 
@@ -364,6 +365,19 @@ def write_csv(rows, fh, columns=COLUMNS):
     w.writerows(rows)
 
 
+def sync_ramp(site, out):
+    """After writing the site's published CSV, copy its dates into the funding ramp's Timeline tab, so the ramp
+    cannot lag the timeline. Skips a CSV written elsewhere and a workbook that has no Timeline tab yet."""
+    import ramp
+    conf = ramp.outputs(site)
+    if not conf.get("ramp") or Path(out).expanduser().resolve() != conf["timeline_csv"].resolve():
+        return
+    if not conf["ramp"].exists():
+        print(f"warning: the ramp {conf['ramp']} is missing, so it was not synced", file=sys.stderr)
+    elif ramp.TIMELINE in openpyxl.load_workbook(conf["ramp"], read_only=True).sheetnames:
+        print(f"synced {ramp.sync(out, conf['ramp'])} milestones into {conf['ramp'].name}")
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--book", default=DEFAULT_BOOK, help="the opening timeline workbook")
@@ -397,6 +411,8 @@ def main(argv=None):
         with open(args.out, "w", encoding="utf-8", newline="") as fh:
             write_csv(rows, fh, columns)
         print(f"wrote {count} tasks to {args.out}")
+        if args.site and not args.teamgantt:
+            sync_ramp(args.site, args.out)
     else:
         write_csv(rows, sys.stdout, columns)
     for t in kept:

@@ -25,6 +25,9 @@ sites:
       construction-documents-complete: committed
       bid-complete: committed
       permits-submitted: estimated
+    outputs:
+      timeline_csv: "~/Library/CloudStorage/GoogleDrive-samit.chaudhuri@gmail.com/My Drive/Work/Franchise/ULC-Personal/Development/Opening Timeline/ULC Los Gatos Opening Timeline.csv"
+      ramp: "~/Library/CloudStorage/GoogleDrive-samit.chaudhuri@gmail.com/My Drive/Work/Franchise/ULC-Personal/Finance/Funding Plan/ULC Funding Ramp.xlsx"
     limits:
       site_acquisition_deadline: 2026-11-09
       site_acquisition_extended: 2027-02-07

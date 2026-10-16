@@ -32,6 +32,14 @@ fi
 
 if echo "$STAGED" | grep -q '^franchise/milestones/'; then
   run_tool_tests "franchise/milestones" "milestones"
+  # The funding ramp must follow the opening timeline CSV; skipped when the Drive files are not mounted.
+  py="$REPO_ROOT/franchise/milestones/.venv/bin/python"
+  [ -x "$py" ] || py="$(command -v python3 || true)"
+  echo "pre-commit: checking the funding ramp against the opening timeline"
+  if ! ( cd "$REPO_ROOT/franchise/milestones" && "$py" ramp.py check --skip-missing ); then
+    echo "pre-commit: the ramp does not follow the timeline — commit blocked. Run: cd franchise/milestones && ./.venv/bin/python ramp.py sync (or bypass with --no-verify)." >&2
+    exit 1
+  fi
 fi
 
 if echo "$STAGED" | grep -q '^inbound-feeds/'; then
