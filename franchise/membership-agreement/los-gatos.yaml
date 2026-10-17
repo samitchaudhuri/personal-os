@@ -1,4 +1,6 @@
-# Center data for the ULC Los Gatos membership agreement. Each entry fills the
+# Center data for the ULC Los Gatos membership agreement. The facts live in
+# the Site 1 identity section of ULC Franchise Project.md, so change them there
+# first. Each entry fills the
 # listed template placeholders. A value of null leaves the placeholder in the
 # generated file so nobody mistakes a guess for a fact. Status is committed for
 # a fact somebody has fixed, assumed for a value we plan around until someone
@@ -20,25 +22,25 @@ fields:
 
   - keys: [CENTERADDRESS, STUDIOADDRESS]
     value: 14235 Walker St, Suite 10, Los Gatos, CA 95032
-    status: assumed
-    basis: The Junction address from Site Selection and the 10/9 ULC facility line. The lease is not signed, so confirm the suite and zip when it is. Section G sends rescission notices here, so presale also needs a mailing address that works before the center exists
+    status: committed
+    basis: Confirmed by Samit on 10/16. Section G sends rescission notices here, so presale also needs a mailing address that works before the center exists
 
   - keys: [CENTEREMAIL, STUDIOEMAIL]
-    value: samit.chaudhuri+losgatos@ultimatelongevitycenters.com
-    status: open
-    basis: The address on the Kite merchant application. Michelle has not answered whether the center gets a role-based address such as losgatos@ultimatelongevitycenters.com
+    value: losgatos@ultimatelongevitycenters.com
+    status: committed
+    basis: Elise gave us this role-based center address, and it has already been given to Kite. It replaces the plus address on the 10/6 merchant application
 
   - keys: [CENTERPHONE, STUDIOPHONE]
-    value: null
-    status: open
-    basis: Kite has a placeholder phone and no center number exists yet
+    value: 408-380-2126
+    status: committed
+    basis: Given by Samit on 10/16
 
   - keys: [STUDIOURL]
-    value: null
-    status: open
-    basis: The center page on ultimatelongevitycenter.com, not yet known
+    value: https://www.ultimatelongevitycenter.com/locations/los-gatos?hsLang=en
+    status: committed
+    basis: The Los Gatos location page, given by Samit on 10/16
 
   - keys: [URLTOEMAILLINK]
-    value: null
-    status: open
-    basis: Section H (e) links a pre-formatted cancellation email, which Kite or the center has to provide
+    value: mailto:losgatos@ultimatelongevitycenters.com?subject=Cancel%20my%20membership
+    status: committed
+    basis: Samit on 10/16 asked for a pre-formatted cancellation email to the center email. Section H (e) reads "found at" this value, so it is a mailto link with the subject filled in
