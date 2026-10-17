@@ -140,17 +140,17 @@ class TestResolve(unittest.TestCase):
 
     def test_presale_prerequisites_fall_between_kickoff_and_vip_start(self):
         r = junction()
-        for key in ("digital-partner-selected", "presale-kit-ordered", "membership-contract-reviewed"):
+        for key in ("digital-partner-selected", "presale-kit-ordered", "membership-agreement-finalized"):
             self.assertEqual(r[key], (D(2026, 10, 9), D(2026, 10, 26)), key)
 
     def test_a_prerequisite_the_site_dates_after_vip_start_collides(self):
-        for key in ("digital-partner-selected", "presale-kit-ordered", "membership-contract-reviewed"):
+        for key in ("digital-partner-selected", "presale-kit-ordered", "membership-agreement-finalized"):
             inputs = dict(JUNCTION["inputs"], **{key: D(2026, 10, 30)})
             s = ms.solve(DURATIONS, inputs)
             self.assertIn("requirement", [k.set_aside.kind for k in s.conflicts], key)
 
     def test_a_prerequisite_the_site_dates_inside_the_window_narrows_vip_start(self):
-        inputs = dict(JUNCTION["inputs"], **{"membership-contract-reviewed": D(2026, 10, 24)})
+        inputs = dict(JUNCTION["inputs"], **{"membership-agreement-finalized": D(2026, 10, 24)})
         s = ms.solve(DURATIONS, inputs)
         self.assertEqual([k for k in s.conflicts if not k.soft], [])
         self.assertEqual(s.ranges["vip-start"], (D(2026, 10, 24), D(2026, 10, 26)))

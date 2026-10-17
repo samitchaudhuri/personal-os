@@ -199,7 +199,7 @@ class TestBuildRows(unittest.TestCase):
         ids = tc.milestone_ids(durations)
         self.assertEqual(ids["digital-partner-selected"], 37)
         self.assertEqual(ids["presale-kit-ordered"], "37.1")
-        self.assertEqual(ids["membership-contract-reviewed"], 19)
+        self.assertEqual(ids["membership-agreement-finalized"], 19)
         self.assertEqual(tc.site_estimates("junction")[37][0], "digital-partner-selected")
         self.assertEqual(tc.extra_milestones("junction")[37][0][1], "presale-kit-ordered")
         rules = tc.milestone_rules()["vip-start"]

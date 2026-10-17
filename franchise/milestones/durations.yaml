@@ -69,8 +69,8 @@ constraints:
   - {from: digital-partner-selected, to: vip-start, duration_days: [0, 17], kind: requirement}
   - {from: presale-kickoff, to: presale-kit-ordered, duration_days: [0, 17], kind: requirement}
   - {from: presale-kit-ordered, to: vip-start, duration_days: [0, 17], kind: requirement}
-  - {from: presale-kickoff, to: membership-contract-reviewed, duration_days: [0, 17], kind: requirement}
-  - {from: membership-contract-reviewed, to: vip-start, duration_days: [0, 17], kind: requirement}
+  - {from: presale-kickoff, to: membership-agreement-finalized, duration_days: [0, 17], kind: requirement}
+  - {from: membership-agreement-finalized, to: vip-start, duration_days: [0, 17], kind: requirement}
   - {from: gm-sourcing, to: gm-offer-accepted, duration_days: [45, 45], kind: estimate}
   - {from: gm-offer-accepted, to: gm-in-seat, duration_days: [14, 28], kind: estimate}
   - {from: gm-in-seat, to: presale-launch, duration_days: [21, 21], kind: preference}
@@ -107,11 +107,11 @@ milestones:
     site_can_fix: true
     basis: The 10/9 kickoff deck lists the kit as a Sales & Operations next step. We control the order and not the delivery, and an order placed before the VIP start should arrive before presale launch, so the lead time is still to confirm with Elise
 
-  - key: membership-contract-reviewed
-    label: Membership contract reviewed
+  - key: membership-agreement-finalized
+    label: Membership agreement finalized
     gantt_row: 19
     site_can_fix: true
-    basis: Review of the ULC membership contract template against the California rules on presale deposits, open questions for Michelle Tomko listed. Presale cannot sell memberships without it, and it has to land between the kickoff and the VIP start
+    basis: The membership agreement is final once ULC approves the attorney redline of the California template, so it can be loaded into Kite. Presale cannot sell memberships without it, and it has to land between the kickoff and the VIP start. The 0 to 17 day range from the kickoff is a placeholder from the review-only version of this milestone and still needs a duration that fits the redline and ULC approval
 
   - key: lease-signed
     label: Lease signed

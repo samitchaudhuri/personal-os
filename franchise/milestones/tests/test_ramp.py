@@ -73,7 +73,7 @@ class TestTabs(unittest.TestCase):
 
     def test_milestones_include_the_presale_prerequisites(self):
         keys = [r[1] for r in TABS[ramp.MILESTONES][1]]
-        for k in ("digital-partner-selected", "presale-kit-ordered", "membership-contract-reviewed"):
+        for k in ("digital-partner-selected", "presale-kit-ordered", "membership-agreement-finalized"):
             self.assertIn(k, keys)
 
     def test_inputs_phases_and_rules_set_aside_come_from_the_generator(self):
