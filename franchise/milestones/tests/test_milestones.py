@@ -138,6 +138,23 @@ class TestResolve(unittest.TestCase):
         self.assertEqual(r["presale-launch"], (D(2026, 12, 4), D(2026, 12, 21)))
         self.assertEqual(r["grand-opening"], (D(2027, 7, 12), D(2027, 8, 5)))
 
+    def test_presale_prerequisites_fall_between_kickoff_and_vip_start(self):
+        r = junction()
+        for key in ("digital-partner-selected", "presale-kit-ordered", "membership-contract-reviewed"):
+            self.assertEqual(r[key], (D(2026, 10, 9), D(2026, 10, 26)), key)
+
+    def test_a_prerequisite_the_site_dates_after_vip_start_collides(self):
+        for key in ("digital-partner-selected", "presale-kit-ordered", "membership-contract-reviewed"):
+            inputs = dict(JUNCTION["inputs"], **{key: D(2026, 10, 30)})
+            s = ms.solve(DURATIONS, inputs)
+            self.assertIn("requirement", [k.set_aside.kind for k in s.conflicts], key)
+
+    def test_a_prerequisite_the_site_dates_inside_the_window_narrows_vip_start(self):
+        inputs = dict(JUNCTION["inputs"], **{"membership-contract-reviewed": D(2026, 10, 24)})
+        s = ms.solve(DURATIONS, inputs)
+        self.assertEqual([k for k in s.conflicts if not k.soft], [])
+        self.assertEqual(s.ranges["vip-start"], (D(2026, 10, 24), D(2026, 10, 26)))
+
     def test_kickoff_slip_moves_vip_and_launch_and_the_gm_requirement_pulls_them_later(self):
         # Kickoff 10/14 gives VIP 10/28 to 10/31 and launch 12/09 to 12/26 from the durations alone.
         # Launch can only be met by the GM at 12/25 or later, so the requirement trims both ranges.
@@ -324,52 +341,50 @@ class TestConflictFlags(unittest.TestCase):
         self.assertIn("4 days", msg)
 
 
-class TestInputsTable(unittest.TestCase):
+class TestInputRows(unittest.TestCase):
     def rows(self, site=JUNCTION):
-        return ms.render_inputs(DURATIONS, site).splitlines()[2:]
+        return ms.input_rows(DURATIONS, site)
 
     def test_lists_every_date_the_site_gives_with_its_status(self):
         rows = self.rows()
         self.assertEqual(len(rows), len(JUNCTION["inputs"]))
-        by_key = {r.split("`")[1]: r for r in rows}
-        self.assertIn("| 2027-02-08 | assumed |", by_key["landlord-delivery"])
-        self.assertIn("| committed |", by_key["presale-kickoff"])
-        self.assertIn("| 2026-11-30 to 2026-12-15 | estimated |", by_key["lease-signed"])
+        by_key = {r[0]: r for r in rows}
+        self.assertEqual(by_key["landlord-delivery"][2:4], ((D(2027, 2, 8), D(2027, 2, 8)), "assumed"))
+        self.assertEqual(by_key["presale-kickoff"][3], "committed")
+        self.assertEqual(by_key["lease-signed"][2:4], ((D(2026, 11, 30), D(2026, 12, 15)), "estimated"))
 
     def test_rows_follow_milestone_order(self):
-        keys = [r.split("`")[1] for r in self.rows()]
+        keys = [r[0] for r in self.rows()]
         order = [m["key"] for m in DURATIONS["milestones"]]
         self.assertEqual(keys, sorted(keys, key=order.index))
 
     def test_site_basis_replaces_the_default(self):
-        by_key = {r.split("`")[1]: r for r in self.rows()}
-        self.assertIn("planning assumption", by_key["landlord-delivery"])
+        by_key = {r[0]: r for r in self.rows()}
+        self.assertIn("planning assumption", by_key["landlord-delivery"][4])
 
     def test_a_date_without_a_status_is_an_error(self):
         site = dict(JUNCTION, status={k: v for k, v in JUNCTION["status"].items() if k != "landlord-delivery"})
         with self.assertRaises(ValueError):
-            ms.render_inputs(DURATIONS, site)
+            ms.input_rows(DURATIONS, site)
 
     def test_unknown_status_is_an_error(self):
         site = dict(JUNCTION, status=dict(JUNCTION["status"], **{"lease-signed": "hoped"}))
         with self.assertRaises(ValueError):
-            ms.render_inputs(DURATIONS, site)
+            ms.input_rows(DURATIONS, site)
 
 
-class TestSetAsideTable(unittest.TestCase):
+class TestSetAsideRows(unittest.TestCase):
     def test_lists_the_preference_set_aside_and_what_it_collides_with(self):
-        table = ms.render_set_aside(ms.solve(DURATIONS, JUNCTION["inputs"]).conflicts)
-        row = table.splitlines()[2]
-        self.assertTrue(row.startswith("| `gm-in-seat to presale-launch` | preference |"))
-        self.assertIn("`gm-sourcing to gm-offer-accepted`", row)
-        self.assertNotIn("`gm-in-seat to presale-launch`", row.split("|")[4])
-        self.assertTrue(row.endswith("| 4 |"))
+        rule, kind, others, short = ms.set_aside_rows(ms.solve(DURATIONS, JUNCTION["inputs"]).conflicts)[0]
+        self.assertEqual((rule, kind, short), ("gm-in-seat to presale-launch", "preference", 4))
+        self.assertIn("gm-sourcing to gm-offer-accepted", others)
+        self.assertNotIn("gm-in-seat to presale-launch", others)
 
     def test_rows_follow_the_order_ignored(self):
         inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 5, 1)})
-        rows = ms.render_set_aside(ms.solve(DURATIONS, inputs).conflicts).splitlines()[2:]
+        rows = ms.set_aside_rows(ms.solve(DURATIONS, inputs).conflicts)
         self.assertEqual(len(rows), 2)
-        self.assertIn("presale-membership-sales", rows[0])
+        self.assertIn("presale-membership-sales", rows[0][0])
 
 
 class TestPhaseFlags(unittest.TestCase):
@@ -408,28 +423,48 @@ class TestPhaseFlags(unittest.TestCase):
         self.assertIn("presale-vip-booking", m["presale-launch"])
         self.assertIn("over its planned", m["presale-launch"])
 
-    def test_phase_table_lists_every_phase(self):
+    def test_phase_rows_list_every_phase(self):
         _, r = self.messages()
-        table = ms.render_phases(DURATIONS, r)
-        for p in DURATIONS["phases"]:
-            self.assertIn(f"`{p['key']}`", table)
-        self.assertIn("`permit-review`", table)
-        self.assertIn("171 to 178 days", table)
+        rows = ms.phase_rows(DURATIONS, r)
+        self.assertEqual([p[0] for p in rows], [p["key"] for p in DURATIONS["phases"]])
+        self.assertEqual(dict((p[0], p[4]) for p in rows)["presale-membership-sales"], (171, 178))
 
 
 class TestRender(unittest.TestCase):
     def test_table_keeps_keys_and_order(self):
-        table = ms.render_table(DURATIONS, junction(), JUNCTION["basis"])
+        table = ms.render_table(DURATIONS, junction(), JUNCTION)
         keys = [line.split("`")[1] for line in table.splitlines()[2:]]
         self.assertEqual(keys, [m["key"] for m in DURATIONS["milestones"]])
 
     def test_site_basis_overrides_default(self):
-        table = ms.render_table(DURATIONS, junction(), JUNCTION["basis"])
+        table = ms.render_table(DURATIONS, junction(), JUNCTION)
         self.assertIn("45 to 60 days", table)
+
+    def test_status_column_marks_inputs_and_computed_dates(self):
+        rows = {r[0]: r for r in ms.milestone_rows(DURATIONS, junction(), JUNCTION)}
+        self.assertEqual(rows["presale-kickoff"][3], "committed")
+        self.assertEqual(rows["soft-open"][3], "computed")
+
+    def test_a_narrowed_input_also_shows_the_range_the_site_gave(self):
+        rows = {r[0]: r for r in ms.milestone_rows(DURATIONS, junction(), JUNCTION)}
+        self.assertEqual(rows["lease-signed"][3], "estimated, given 2026-11-30 to 2026-12-15")
 
     def test_point_and_range_formats(self):
         self.assertEqual(ms.fmt((D(2026, 11, 30), D(2026, 11, 30))), "2026-11-30")
         self.assertEqual(ms.fmt((D(2026, 10, 8), D(2026, 10, 15))), "2026-10-08 to 2026-10-15")
+
+
+class TestSections(unittest.TestCase):
+    def test_flags_follow_the_milestone_table_when_something_is_off(self):
+        text = ms.render_sections(DURATIONS, JUNCTION, ms.solve(DURATIONS, JUNCTION["inputs"]))
+        heads = [l for l in text.splitlines() if l.startswith("#### ")]
+        self.assertEqual(heads, ["#### Milestones", "#### Flags"])
+        self.assertIn("- `gm-in-seat to presale-launch` (preference) was set aside, 4 days short", text)
+
+    def test_flags_heading_is_left_out_when_nothing_is_off(self):
+        text = ms.render_sections(DURATIONS, JUNCTION, ms.Solution(junction(), [], set()))
+        self.assertNotIn("#### Flags", text)
+        self.assertNotIn("#### Inputs", text)
 
 
 class TestRewrite(unittest.TestCase):

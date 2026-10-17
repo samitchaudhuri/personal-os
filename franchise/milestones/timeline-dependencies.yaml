@@ -28,12 +28,12 @@ dependencies:
   35: {after: [34], why: CRM set up follows the kickoff, as in the 10/9 deck}
   36: {after: [34], why: Payroll provider selection follows the kickoff}
   37: {after: [34], why: Digital vendor selection follows the kickoff, as in the 10/9 deck}
-  38: {after: [35, 37], why: The VIP campaign needs the CRM and the digital partner}
+  38: {after: [19, 35, 37], why: The VIP campaign needs the CRM and the digital partner and the reviewed membership contract}
   39: {after: [32], why: Hiring and training follow recruiting}
   40: {after: [34], why: Weekly calls begin after the kickoff}
   41: {after: [24], why: Signage needs a lease and a site plan}
   42: {after: [34], why: Grassroots planning follows the kickoff}
-  43: {after: [38, 19], why: Founding sales follow the VIP campaign and the membership contract review}
+  43: {after: [38], why: Founding sales follow the VIP campaign}
   44: {after: [34], why: Advisor recruiting follows the kickoff}
   45: {after: [44], why: Hiring follows recruiting}
   46: {after: [29, 39, 45], why: Staff train on installed equipment once the GM and advisors are hired}

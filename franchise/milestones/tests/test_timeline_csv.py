@@ -192,7 +192,23 @@ class TestBuildRows(unittest.TestCase):
     def test_skip_list_is_workbook_rows_and_no_generator_dated_row_is_on_it(self):
         dated = set(tc.site_estimates("junction"))
         self.assertEqual(set(tc.SKIP_ROWS) & dated, set())
-        self.assertEqual(len(tc.SKIP_ROWS), 11)
+        self.assertEqual(len(tc.SKIP_ROWS), 10)
+
+    def test_presale_prerequisites_have_rows_and_vip_start_follows_them(self):
+        durations = tc.ms.load_yaml("durations.yaml")
+        ids = tc.milestone_ids(durations)
+        self.assertEqual(ids["digital-partner-selected"], 37)
+        self.assertEqual(ids["presale-kit-ordered"], "37.1")
+        self.assertEqual(ids["membership-contract-reviewed"], 19)
+        self.assertEqual(tc.site_estimates("junction")[37][0], "digital-partner-selected")
+        self.assertEqual(tc.extra_milestones("junction")[37][0][1], "presale-kit-ordered")
+        rules = tc.milestone_rules()["vip-start"]
+        refs = {r for text, rows, _ in rules for r in rows}
+        self.assertEqual(refs, {"19", 19, 37, "37.1", 34} & refs)
+        self.assertTrue({19, 37, "37.1"} <= refs)
+        deps = tc.load_dependencies()
+        self.assertEqual(deps[38]["after"], [19, 35, 37])
+        self.assertNotIn(19, deps[43]["after"])
 
     def test_skipping_a_row_passes_its_predecessors_to_its_successors(self):
         tasks = [{"row": r, "category": "g", "group": "G", "task": f"t{r}", "start": None, "end": None}

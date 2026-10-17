@@ -48,7 +48,7 @@ COLUMNS = ["id", "milestone", "key", "start", "end", "duration", "rule", "prefer
 
 # Workbook rows that are not milestones: ongoing activities and borderline setup tasks. Both exports drop
 # them unless --skip says otherwise, and their predecessors pass to their successors.
-SKIP_ROWS = [13, 21, 33, 35, 36, 37, 40, 42, 44, 47, 48]
+SKIP_ROWS = [13, 21, 33, 35, 36, 40, 42, 44, 47, 48]
 
 # The workbook's group names, shortened for the export.
 PHASE_NAMES = {"Site Selection & Legal": "Site Selection", "Lease, Design & Construction": "Lease, Design & Build"}
@@ -366,16 +366,17 @@ def write_csv(rows, fh, columns=COLUMNS):
 
 
 def sync_ramp(site, out):
-    """After writing the site's published CSV, copy its dates into the funding ramp's Timeline tab, so the ramp
-    cannot lag the timeline. Skips a CSV written elsewhere and a workbook that has no Timeline tab yet."""
+    """After writing the site's published CSV, rewrite the funding ramp's generated tabs from a fresh generator
+    run, so the ramp cannot lag the schedule. Skips a CSV written elsewhere and a workbook with neither a
+    Milestones nor an old Timeline tab."""
     import ramp
     conf = ramp.outputs(site)
     if not conf.get("ramp") or Path(out).expanduser().resolve() != conf["timeline_csv"].resolve():
         return
     if not conf["ramp"].exists():
         print(f"warning: the ramp {conf['ramp']} is missing, so it was not synced", file=sys.stderr)
-    elif ramp.TIMELINE in openpyxl.load_workbook(conf["ramp"], read_only=True).sheetnames:
-        print(f"synced {ramp.sync(out, conf['ramp'])} milestones into {conf['ramp'].name}")
+    elif {ramp.MILESTONES, ramp.OLD_TIMELINE} & set(openpyxl.load_workbook(conf["ramp"], read_only=True).sheetnames):
+        print(f"synced {ramp.sync(conf['ramp'], ramp.generated_tabs(site))} milestones into {conf['ramp'].name}")
 
 
 def main(argv=None):

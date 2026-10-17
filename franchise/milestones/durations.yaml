@@ -65,6 +65,12 @@ phases:
     basis: Michelle Tomko said on 10/14 that membership sales run 4 to 6 months, which replaces the deck and the playbook's 3 to 5 months. Soft open mostly comes from the build chain, so this phase bounds it from launch and flags a build that falls outside the window
 
 constraints:
+  - {from: presale-kickoff, to: digital-partner-selected, duration_days: [0, 17], kind: requirement}
+  - {from: digital-partner-selected, to: vip-start, duration_days: [0, 17], kind: requirement}
+  - {from: presale-kickoff, to: presale-kit-ordered, duration_days: [0, 17], kind: requirement}
+  - {from: presale-kit-ordered, to: vip-start, duration_days: [0, 17], kind: requirement}
+  - {from: presale-kickoff, to: membership-contract-reviewed, duration_days: [0, 17], kind: requirement}
+  - {from: membership-contract-reviewed, to: vip-start, duration_days: [0, 17], kind: requirement}
   - {from: gm-sourcing, to: gm-offer-accepted, duration_days: [45, 45], kind: estimate}
   - {from: gm-offer-accepted, to: gm-in-seat, duration_days: [14, 28], kind: estimate}
   - {from: gm-in-seat, to: presale-launch, duration_days: [21, 21], kind: preference}
@@ -88,6 +94,24 @@ milestones:
     gantt_row: 34
     input: true
     basis: Elise Budowanec offered three slots on 10/5 and Samit accepted Friday 10/9 at 11:30 AM PT with Don Michael, Michelle Tomko and Elise
+
+  - key: digital-partner-selected
+    label: Digital partner selected
+    gantt_row: 37
+    site_can_fix: true
+    basis: Elise Budowanec's 10/9 follow-up asks Samit to pick one of three approved local agencies, PRSPR, 5th Element or JL Marketing, by 10/23 to launch campaigns on 10/26. It has to land between the kickoff and the VIP start
+
+  - key: presale-kit-ordered
+    label: Presale marketing kit ordered
+    gantt_row: 37
+    site_can_fix: true
+    basis: The 10/9 kickoff deck lists the kit as a Sales & Operations next step. We control the order and not the delivery, and an order placed before the VIP start should arrive before presale launch, so the lead time is still to confirm with Elise
+
+  - key: membership-contract-reviewed
+    label: Membership contract reviewed
+    gantt_row: 19
+    site_can_fix: true
+    basis: Review of the ULC membership contract template against the California rules on presale deposits, open questions for Michelle Tomko listed. Presale cannot sell memberships without it, and it has to land between the kickoff and the VIP start
 
   - key: lease-signed
     label: Lease signed

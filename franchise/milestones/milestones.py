@@ -411,41 +411,33 @@ def phase_flags(durations, resolved, skip=()):
     return out
 
 
-def render_phases(durations, resolved):
-    lines = ["| Phase | From | To | Planned | Actual | Basis |",
-             "| ----- | ---- | -- | ------- | ------ | ----- |"]
-    for p in durations.get("phases", []):
-        lo, hi = p["duration_days"]
-        actual = days(*phase_pairing(p, resolved))
-        lines.append(f"| `{p['key']}` | `{p['start']}` | `{p['end']}` | {days(lo, hi)} | {actual} | {p['basis']} |")
-    return "\n".join(lines)
+def phase_rows(durations, resolved):
+    """[(key, start, end, planned, actual, basis)] for every phase, with planned and actual as (low, high) days."""
+    return [(p["key"], p["start"], p["end"], tuple(p["duration_days"]), phase_pairing(p, resolved), p["basis"])
+            for p in durations.get("phases", [])]
 
 
-def render_set_aside(conflicts):
-    """Table of the rules set aside to draw the dates, in the order they were set aside."""
-    lines = ["| Set aside | Kind | Collides with | Days short |",
-             "| --------- | ---- | ------------- | ---------- |"]
-    for k in conflicts:
-        others = ", ".join(f"`{c.name}`" for c in k.constraints if c != k.set_aside)
-        lines.append(f"| `{k.set_aside.name}` | {k.set_aside.kind} | {others} | {k.short} |")
-    return "\n".join(lines)
+def set_aside_rows(conflicts):
+    """[(rule, kind, collides with, days short)] for the rules set aside, in the order they were set aside."""
+    return [(k.set_aside.name, k.set_aside.kind,
+             ", ".join(c.name for c in k.constraints if c != k.set_aside), k.short) for k in conflicts]
 
 
 STATUSES = ("committed", "estimated", "assumed")
 
 
-def render_inputs(durations, site):
-    """Table of every date the site gives, with its status and basis, in milestone order."""
+def input_rows(durations, site):
+    """[(key, milestone, given range, status, basis)] for every date the site gives, in milestone order."""
     basis, status = site.get("basis", {}), site.get("status", {})
-    lines = ["| Input | Date | Status | Basis |", "| ----- | ---- | ------ | ----- |"]
+    out = []
     for m in durations["milestones"]:
         key = m["key"]
         if key not in site["inputs"]:
             continue
         if status.get(key) not in STATUSES:
             raise ValueError(f"input {key!r} needs a status, one of {STATUSES}")
-        lines.append(f"| `{key}` | {fmt(as_range(site['inputs'][key]))} | {status[key]} | {basis.get(key, m['basis'])} |")
-    return "\n".join(lines)
+        out.append((key, m["label"], as_range(site["inputs"][key]), status[key], basis.get(key, m["basis"])))
+    return out
 
 
 def fmt(rng):
@@ -453,16 +445,50 @@ def fmt(rng):
     return lo.isoformat() if lo == hi else f"{lo.isoformat()} to {hi.isoformat()}"
 
 
-def render_table(durations, resolved, site_basis=None):
-    site_basis = site_basis or {}
-    lines = ["| Key | Milestone | Estimate | Gantt row | Basis |",
-             "| --- | --------- | -------- | --------- | ----- |"]
+def milestone_rows(durations, resolved, site):
+    """[(key, milestone, range, status, gantt row, basis)] for every milestone. An input carries its status, and a
+    lease range that other rules narrowed also names the range the site gave. Everything else is computed."""
+    given = {r[0]: r for r in input_rows(durations, site)}
+    out = []
     for m in durations["milestones"]:
         key = m["key"]
-        row = m.get("gantt_row") or ""
-        basis = site_basis.get(key, m["basis"])
-        lines.append(f"| `{key}` | {m['label']} | {fmt(resolved[key])} | {row} | {basis} |")
+        status, basis = "computed", site.get("basis", {}).get(key, m["basis"])
+        if key in given:
+            status = given[key][3]
+            if given[key][2] != resolved[key]:
+                status = f"{status}, given {fmt(given[key][2])}"
+        out.append((key, m["label"], resolved[key], status, m.get("gantt_row") or "", basis))
+    return out
+
+
+def render_table(durations, resolved, site):
+    lines = ["| Key | Milestone | Estimate | Status | Gantt row | Basis |",
+             "| --- | --------- | -------- | ------ | --------- | ----- |"]
+    for key, label, rng, status, row, basis in milestone_rows(durations, resolved, site):
+        lines.append(f"| `{key}` | {label} | {fmt(rng)} | {status} | {row} | {basis} |")
     return "\n".join(lines)
+
+
+def flag_lines(durations, solution):
+    """Bullets for the rules set aside and the phases off their planned range; empty when nothing is off."""
+    out = []
+    for rule, kind, others, short in set_aside_rows(solution.conflicts):
+        out.append(f"- `{rule}` ({kind}) was set aside, {short} days short against {others}")
+    for end, msg in phase_flags(durations, solution.ranges, solution.set_aside_phases):
+        out.append(f"- `{end}`: {msg}")
+    return out
+
+
+def render_sections(durations, site, solution):
+    """The milestone table with its statuses, then a flags list only when something is off."""
+    parts = [("Milestones", "Every milestone with the range of dates the rules allow, computed from the inputs. "
+              "Status says how firm each input is, and computed marks a date the rules derive.",
+              render_table(durations, solution.ranges, site))]
+    flags_ = flag_lines(durations, solution)
+    if flags_:
+        parts.append(("Flags", "Rules the dates could not satisfy together and phases outside their planned length.",
+                      "\n".join(flags_)))
+    return "\n\n".join(f"#### {title}\n\n{blurb}\n\n{body}" for title, blurb, body in parts)
 
 
 def rewrite_note(path, site, table):
@@ -489,11 +515,7 @@ def main(argv=None):
     site = sites["sites"][args.site]
     solution = solve(durations, site["inputs"])
     resolved = solution.ranges
-    table = render_inputs(durations, site) + "\n\n" + render_table(durations, resolved, site.get("basis"))
-    if durations.get("phases"):
-        table += "\n\n" + render_phases(durations, resolved)
-    if solution.conflicts:
-        table += "\n\n" + render_set_aside(solution.conflicts)
+    table = render_sections(durations, site, solution)
     if args.write:
         rewrite_note(args.write, args.site, table)
         print(f"rewrote {args.site} block in {args.write}")
