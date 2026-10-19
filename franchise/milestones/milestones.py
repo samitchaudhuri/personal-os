@@ -509,9 +509,15 @@ def main(argv=None):
     ap.add_argument("--write", metavar="NOTE", help="rewrite the site's marked block in this note")
     args = ap.parse_args(argv)
 
-    durations, sites = load_yaml("durations.yaml"), load_yaml("sites.yaml")
+    sites = load_yaml("sites.yaml")
     if args.site not in sites["sites"]:
         raise SystemExit(f"no site {args.site!r} in sites.yaml; have {', '.join(sites['sites'])}")
+    if args.write:
+        import tasks     # imported here because tasks imports this module
+        for line in tasks.take_actuals(args.site):
+            print(f"actual: {line}")
+        sites = load_yaml("sites.yaml")
+    durations = load_yaml("durations.yaml")
     site = sites["sites"][args.site]
     solution = solve(durations, site["inputs"])
     resolved = solution.ranges
@@ -519,6 +525,7 @@ def main(argv=None):
     if args.write:
         rewrite_note(args.write, args.site, table)
         print(f"rewrote {args.site} block in {args.write}")
+        print(f"moved {tasks.sync_note(args.site, resolved)} task due dates")
     else:
         print(table)
     for key, msg in ([(c.key, c.message) for c in solution.conflicts if not c.soft]
