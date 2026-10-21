@@ -61,10 +61,16 @@ class Constraint:
     name: str
     order: int
     phase: Optional[str] = None
+    check: bool = False
 
     @property
     def not_before(self):
         return self.hi is None
+
+    @property
+    def pins(self):
+        """A not-before rule starts its milestone as soon as it allows, unless it is only a check."""
+        return self.not_before and not self.check
 
 
 @dataclass(frozen=True)
@@ -126,7 +132,7 @@ def constraints_of(durations):
         if hi is not None and hi < lo:
             raise ValueError(f"rule {frm} to {c['to']} has hi below lo")
         out.append(Constraint(frm, c["to"], lo, hi, c["kind"], c.get("name") or f"{frm} to {c['to']}",
-                              i, c.get("phase")))
+                              i, c.get("phase"), bool(c.get("check"))))
     return out
 
 
@@ -206,7 +212,7 @@ def stn(keys, fixed, active):
         base.append(Edge(k, REF, -lo, Fixed(k), False))
     not_before = {}
     for c in active:
-        if c.not_before:
+        if c.pins:
             not_before.setdefault(c.to, []).append(c)
     closure = {}
     while True:
@@ -304,7 +310,7 @@ def describe(cycle):
 
 def pick_set_aside(cons, cycle):
     """Choose the rule that gives: a preference, else a requirement, else an estimate, the last listed first."""
-    can_give = [c for c in cons if not c.not_before]
+    can_give = [c for c in cons if not c.pins]
     for kind in ("preference", "requirement", "estimate"):
         pool = [c for c in can_give if c.kind == kind]
         if pool:

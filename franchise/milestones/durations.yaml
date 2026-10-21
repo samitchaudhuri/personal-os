@@ -15,7 +15,8 @@
 # `duration_days` pair with hi null, such as [10, null], is a not-before rule: it sets the
 # earliest date and no latest date. A milestone with not-before rules starts as
 # soon as the latest of them allows, so its latest date is the latest of their
-# latest dates.
+# latest dates. A rule with `check: true` and hi null holds the earliest date only: it is
+# checked and never starts its milestone, so the dates come from the other rules.
 #
 # Each milestone is an input or computed. `input: true` means the site must give
 # the date in sites.yaml. Any other milestone is computed from the rules, and a
@@ -67,8 +68,9 @@ phases:
 constraints:
   - {from: presale-kickoff, to: digital-partner-selected, duration_days: [0, 17], kind: requirement}
   - {from: digital-partner-selected, to: vip-start, duration_days: [0, 17], kind: requirement}
-  - {from: presale-kickoff, to: presale-kit-ordered, duration_days: [0, 17], kind: requirement}
-  - {from: presale-kit-ordered, to: vip-start, duration_days: [0, 17], kind: requirement}
+  - {from: presale-kickoff, to: presale-kit-ordered, duration_days: [0, null], kind: requirement, check: true}
+  - {from: presale-kit-ordered, to: gm-in-seat, duration_days: [14, null], kind: requirement, check: true}
+  - {from: presale-kit-ordered, to: presale-launch, duration_days: [14, null], kind: requirement, check: true}
   - {from: presale-kickoff, to: membership-agreement-finalized, duration_days: [0, 17], kind: requirement}
   - {from: membership-agreement-finalized, to: vip-start, duration_days: [0, 17], kind: requirement}
   - {from: gm-sourcing, to: gm-offer-accepted, duration_days: [45, 45], kind: estimate}
@@ -105,7 +107,7 @@ milestones:
     label: Presale marketing kit ordered
     gantt_row: 37
     site_can_fix: true
-    basis: The 10/9 kickoff deck lists the kit as a Sales & Operations next step. We control the order and not the delivery, and an order placed before the VIP start should arrive before presale launch, so the lead time is still to confirm with Elise
+    basis: The 10/9 kickoff deck lists the kit as a Sales & Operations next step. We control the order and not the delivery. Elise said on the 10/21 call that the lead time is 2 weeks, that the kit is needed for grassroots events and that it can arrive early and wait in the garage. Samit wants the order at least 2 weeks before the GM is in seat or any grassroots event. The order no longer has to come before the VIP start, because the kit is not needed for it. The model backs the date out from the GM in seat and from presale launch with two requirements of at least 14 days marked `check`, which move no date, so the window runs from the kickoff to the latest date both allow. The grassroots events have no milestone, so they are not checked
 
   - key: membership-agreement-finalized
     label: Membership agreement finalized

@@ -34,6 +34,19 @@ def c(frm, to, lo, hi, kind="estimate"):
     return {"from": frm, "to": to, "duration_days": [lo, hi], "kind": kind}
 
 
+class TestCheckRule(unittest.TestCase):
+    def solve(self, check):
+        rule = dict(c("a", "b", 14, None, "requirement"), check=check)
+        d = synthetic([c("s", "a", 0, 5), c("s", "b", 30, 40), rule], ["s", "a", "b"], s=1)
+        return ms.resolve(d, {"s": D(2026, 1, 1)})
+
+    def test_a_check_leaves_the_milestone_where_the_other_rules_put_it(self):
+        self.assertEqual(self.solve(True)["b"], (D(2026, 1, 31), D(2026, 2, 10)))
+
+    def test_without_check_the_not_before_rule_starts_the_milestone(self):
+        self.assertEqual(self.solve(False)["b"], (D(2026, 1, 15), D(2026, 1, 20)))
+
+
 class TestResolve(unittest.TestCase):
     def test_inputs_pass_through(self):
         r = junction()
@@ -140,14 +153,24 @@ class TestResolve(unittest.TestCase):
 
     def test_presale_prerequisites_fall_between_kickoff_and_vip_start(self):
         r = junction()
-        for key in ("digital-partner-selected", "presale-kit-ordered", "membership-agreement-finalized"):
+        for key in ("digital-partner-selected", "membership-agreement-finalized"):
             self.assertEqual(r[key], (D(2026, 10, 9), D(2026, 10, 26)), key)
 
+    def test_the_kit_order_runs_from_kickoff_to_the_latest_the_gm_and_launch_checks_allow(self):
+        self.assertEqual(junction()["presale-kit-ordered"], (D(2026, 10, 9), D(2026, 12, 4)))
+
     def test_a_prerequisite_the_site_dates_after_vip_start_collides(self):
-        for key in ("digital-partner-selected", "presale-kit-ordered", "membership-agreement-finalized"):
+        for key in ("digital-partner-selected", "membership-agreement-finalized"):
             inputs = dict(JUNCTION["inputs"], **{key: D(2026, 10, 30)})
             s = ms.solve(DURATIONS, inputs)
             self.assertIn("requirement", [k.set_aside.kind for k in s.conflicts], key)
+
+    def test_a_kit_order_after_vip_start_is_fine_but_inside_14_days_of_launch_collides(self):
+        key = "presale-kit-ordered"
+        late = ms.solve(DURATIONS, dict(JUNCTION["inputs"], **{key: D(2026, 10, 30)}))
+        self.assertEqual([k for k in late.conflicts if not k.soft], [])
+        too_late = ms.solve(DURATIONS, dict(JUNCTION["inputs"], **{key: D(2026, 12, 10)}))
+        self.assertIn("requirement", [k.set_aside.kind for k in too_late.conflicts])
 
     def test_a_prerequisite_the_site_dates_inside_the_window_narrows_vip_start(self):
         inputs = dict(JUNCTION["inputs"], **{"membership-agreement-finalized": D(2026, 10, 24)})
