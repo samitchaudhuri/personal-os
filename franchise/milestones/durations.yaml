@@ -86,8 +86,8 @@ constraints:
   - {from: equipment-installed, to: av-ordered, duration_days: [-84, -84], kind: estimate}
   - {from: soft-open, to: equipment-ordered, duration_days: [-60, -45], kind: estimate}
   - {from: construction-start, to: millwork-lighting-ordered, duration_days: [0, 0], kind: estimate}
-  - {from: construction-start, to: build-complete, duration_days: [105, 105], kind: estimate}
-  - {from: construction-start, to: soft-open, duration_days: [112, 112], kind: estimate}
+  - {from: construction-start, to: build-complete, duration_days: [84, 98], kind: estimate}
+  - {from: construction-start, to: soft-open, duration_days: [91, 105], kind: estimate}
   - {from: soft-open, to: grand-opening, duration_days: [42, 56], kind: estimate}
 
 milestones:
@@ -206,12 +206,12 @@ milestones:
   - key: build-complete
     label: Certificate of occupancy issued
     gantt_row: 30
-    basis: Template issues it 15 weeks after construction starts, week of 3/3 against a 11/18 start
+    basis: Jason Park quoted 12 to 14 weeks of construction on the 10/14 call, 84 to 98 days, which replaces the franchisor template's 15 weeks. We read his range as construction start to certificate of occupancy
 
   - key: soft-open
     label: Soft open
     gantt_row: 49
-    basis: Template opens 16 weeks after construction starts, 3/10 against 11/18, which matches the Junction model's July 2027
+    basis: One week after the certificate of occupancy, the template's gap between its 15 and 16 weeks, so 13 to 15 weeks after construction starts
 
   - key: vip-start
     label: Pre-booking starts, VIP list opens

@@ -69,9 +69,9 @@ class TestResolve(unittest.TestCase):
         self.assertEqual(r["lighting-flooring-delivered"], rg((2027, 3, 22), (2027, 4, 1)))
         self.assertEqual(r["equipment-installed"], rg((2027, 5, 10), (2027, 5, 20)))
         self.assertEqual(r["av-ordered"], rg((2027, 2, 15), (2027, 2, 25)))
-        self.assertEqual(r["equipment-ordered"], rg((2027, 4, 1), (2027, 4, 26)))
-        self.assertEqual(r["build-complete"], rg((2027, 5, 24), (2027, 6, 3)))
-        self.assertEqual(r["soft-open"], rg((2027, 5, 31), (2027, 6, 10)))
+        self.assertEqual(r["equipment-ordered"], rg((2027, 3, 11), (2027, 4, 19)))
+        self.assertEqual(r["build-complete"], rg((2027, 5, 3), (2027, 5, 27)))
+        self.assertEqual(r["soft-open"], rg((2027, 5, 10), (2027, 6, 3)))
 
     def test_equipment_is_ordered_and_paid_45_to_60_days_before_soft_open(self):
         r = junction()
@@ -121,15 +121,15 @@ class TestResolve(unittest.TestCase):
         self.assertEqual(junction()["construction-start"][0], D(2027, 2, 8))
 
     def test_template_gaps_from_construction_start(self):
-        # Template: construction 11/18, lighting 12/30, install 2/17, CO week of 3/3, open 3/10.
+        # Template: construction 11/18, lighting 12/30, install 2/17. Jason Park: CO 12 to 14 weeks in, open a week later.
         start = D(2026, 11, 18)
         inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": start,
                                              "permits-received": D(2026, 10, 1)})
         r = ms.resolve(DURATIONS, inputs)
         self.assertEqual(r["lighting-flooring-delivered"][0], D(2026, 12, 30))
         self.assertEqual(r["equipment-installed"][0], D(2027, 2, 17))
-        self.assertEqual(r["build-complete"][0], D(2027, 3, 3))
-        self.assertEqual(r["soft-open"][0], D(2027, 3, 10))
+        self.assertEqual(r["build-complete"][0], D(2027, 2, 10))
+        self.assertEqual(r["soft-open"][0], D(2027, 2, 17))
 
     def test_rent_starts_150_days_after_the_later_not_before_rule(self):
         # Delivery 2/8 plus 150 days is 7/8, later than the earliest permits plus 150 days, 6/28.
@@ -138,8 +138,8 @@ class TestResolve(unittest.TestCase):
     def test_permits_submitted_within_60_days_of_lease(self):
         inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "permits-submitted"}
         # 60 days after the latest lease is 2/13, but soft open must stay within 180 days of the
-        # latest launch, and that pulls the latest submission back to 1/2.
-        self.assertEqual(ms.resolve(DURATIONS, inputs)["permits-submitted"], (D(2026, 11, 30), D(2027, 1, 2)))
+        # latest launch, and that pulls the latest submission back to 1/23.
+        self.assertEqual(ms.resolve(DURATIONS, inputs)["permits-submitted"], (D(2026, 11, 30), D(2027, 1, 23)))
 
     def test_site_fixed_submission_narrows_the_lease_backward(self):
         # Submission fixed on 12/14 within 0 to 60 days of the lease means the lease is signed by 12/14.
@@ -149,7 +149,7 @@ class TestResolve(unittest.TestCase):
         r = junction()
         self.assertEqual(r["vip-start"], (D(2026, 10, 23), D(2026, 10, 26)))
         self.assertEqual(r["presale-launch"], (D(2026, 12, 4), D(2026, 12, 21)))
-        self.assertEqual(r["grand-opening"], (D(2027, 7, 12), D(2027, 8, 5)))
+        self.assertEqual(r["grand-opening"], (D(2027, 6, 21), D(2027, 7, 29)))
 
     def test_presale_prerequisites_fall_between_kickoff_and_vip_start(self):
         r = junction()
@@ -198,7 +198,7 @@ class TestResolve(unittest.TestCase):
 
     def test_delivery_slip_moves_soft_open(self):
         inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 5, 1)})
-        self.assertEqual(ms.resolve(DURATIONS, inputs)["soft-open"][0], D(2027, 8, 21))
+        self.assertEqual(ms.resolve(DURATIONS, inputs)["soft-open"][0], D(2027, 7, 31))
 
     def test_slipping_sourcing_moves_the_gm(self):
         inputs = dict(JUNCTION["inputs"], **{"gm-sourcing": D(2026, 10, 12)})
@@ -423,7 +423,7 @@ class TestPhaseFlags(unittest.TestCase):
         s = ms.solve(DURATIONS, dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 6, 1)}))
         messages = [k.message for k in s.conflicts if k.set_aside.phase == "presale-membership-sales"]
         self.assertEqual(len(messages), 1)
-        self.assertIn("improve by 94 days in total", messages[0])
+        self.assertIn("improve by 73 days in total", messages[0])
         self.assertIn("landlord-delivery to construction-start", messages[0])
         self.assertNotIn("soft-open", dict(ms.phase_flags(DURATIONS, s.ranges, s.set_aside_phases)))
 
@@ -450,7 +450,7 @@ class TestPhaseFlags(unittest.TestCase):
         _, r = self.messages()
         rows = ms.phase_rows(DURATIONS, r)
         self.assertEqual([p[0] for p in rows], [p["key"] for p in DURATIONS["phases"]])
-        self.assertEqual(dict((p[0], p[4]) for p in rows)["presale-membership-sales"], (171, 178))
+        self.assertEqual(dict((p[0], p[4]) for p in rows)["presale-membership-sales"], (157, 164))
 
 
 class TestRender(unittest.TestCase):
