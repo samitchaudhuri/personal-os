@@ -3,8 +3,8 @@
 
 Each task row of the workbook becomes one CSV row with its category, group,
 sample bar start and end, and proposed predecessors from timeline-dependencies.yaml.
-Rows stay in their categories, and within a category run in time order, by the site estimate when
-there is one and else the bar, with each task after its predecessors in the category.
+Rows stay in their phases, and within a phase run in increasing start order, by the site estimate when
+there is one and else the bar, with each task after its predecessors in the phase when their starts tie.
 Bars are the colored cells of the row. Column D is week 1, and column N of the
 sheet starts B2 plus seven days times its week number, so dates come from the
 anchor date in B2 and not from the formula cells, which hold no cached values
@@ -139,12 +139,12 @@ def early_starts(tasks, deps):
 
 
 def predecessor_first(tasks, deps, estimates=None):
-    """Return the tasks grouped by category in first-seen order, each category in time order.
+    """Return the tasks grouped by phase in first-seen order, each phase in time order.
 
-    Within a category, a task's time is the start of its site estimate when it has one, else its
-    bar start. Each step takes the ready task, one whose predecessors in the category are all
+    Within a phase, a task's time is the start of its site estimate when it has one, else its
+    bar start. Each step takes the ready task, one whose predecessors in the phase are all
     placed, with the earliest time, and workbook order breaks ties. A predecessor in another
-    category does not hold a task back.
+    phase does not hold a task back.
     """
     estimates = estimates or {}
 
@@ -154,11 +154,11 @@ def predecessor_first(tasks, deps, estimates=None):
 
     groups = []
     for t in tasks:
-        if t["category"] not in groups:
-            groups.append(t["category"])
+        if t["group"] not in groups:
+            groups.append(t["group"])
     out = []
     for g in groups:
-        left = [t for t in tasks if t["category"] == g]
+        left = [t for t in tasks if t["group"] == g]
         mine = {t["row"] for t in left}
         placed = set()
         while left:
@@ -207,7 +207,18 @@ def build_rows(tasks, deps, estimates=None, rules=None, extras=None):
                 "rule": "; ".join(r[0] for r in rules.get(xkey, []) if r[2] != "preference"),
                 "preference": "; ".join(r[0] for r in rules.get(xkey, []) if r[2] == "preference"),
             })
-    return renumber(out)
+    return renumber(in_start_order(out))
+
+
+def in_start_order(rows):
+    """Keep the phases in first-seen order and sort each phase by increasing start, the site estimate when the row has
+    one and else the template bar. The sort is stable, so rows that tie keep their predecessor-first order, and the
+    rows added from durations.yaml take their place by date and not right after the row they share."""
+    phases = []
+    for r in rows:
+        if r["phase"] not in phases:
+            phases.append(r["phase"])
+    return sorted(rows, key=lambda r: (phases.index(r["phase"]), r.get("start") or r.get("sample_start") or "9999-12-31"))
 
 
 def short_name(task):

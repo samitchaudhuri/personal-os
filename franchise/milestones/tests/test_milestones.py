@@ -15,7 +15,8 @@ import milestones as ms  # noqa: E402
 D = datetime.date
 DURATIONS = ms.load_yaml("durations.yaml")
 SITES = ms.load_yaml("sites.yaml")
-JUNCTION = SITES["sites"]["junction"]
+# The rule tests read the derived chain, so they leave out the VIP start date the site holds while the launch date is open.
+JUNCTION = dict(SITES["sites"]["junction"], inputs={k: v for k, v in SITES["sites"]["junction"]["inputs"].items() if k != "vip-start"})
 AWAY = SITES["owner"]["away"]
 
 

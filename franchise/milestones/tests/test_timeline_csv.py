@@ -169,19 +169,25 @@ class TestBuildRows(unittest.TestCase):
         self.assertEqual(len(lines), 1 + len(tasks))
 
     def test_predecessors_come_before_successors(self):
-        tasks = [{"row": r, "category": "g", "start": D(2026, 1, r)} for r in (1, 2, 3)]
+        tasks = [{"row": r, "group": "g", "start": D(2026, 1, r)} for r in (1, 2, 3)]
         deps = {1: {"after": [3]}, 3: {"after": [2]}}
         self.assertEqual([t["row"] for t in tc.predecessor_first(tasks, deps)], [2, 3, 1])
 
     def test_time_orders_rows_when_no_dependency_does(self):
-        tasks = [{"row": 1, "category": "g", "start": D(2026, 1, 1)}, {"row": 2, "category": "g", "start": D(2026, 2, 1)}]
+        tasks = [{"row": 1, "group": "g", "start": D(2026, 1, 1)}, {"row": 2, "group": "g", "start": D(2026, 2, 1)}]
         est = {1: ("k", (D(2026, 5, 1), None))}
         self.assertEqual([t["row"] for t in tc.predecessor_first(tasks, {}, est)], [2, 1])
 
-    def test_categories_stay_together_in_workbook_order(self):
-        tasks = [{"row": 1, "category": "a", "start": D(2026, 3, 1)}, {"row": 2, "category": "b", "start": D(2026, 1, 1)},
-                 {"row": 3, "category": "a", "start": D(2026, 2, 1)}]
+    def test_phases_stay_together_in_workbook_order(self):
+        tasks = [{"row": 1, "group": "a", "start": D(2026, 3, 1)}, {"row": 2, "group": "b", "start": D(2026, 1, 1)},
+                 {"row": 3, "group": "a", "start": D(2026, 2, 1)}]
         self.assertEqual([t["row"] for t in tc.predecessor_first(tasks, {})], [3, 1, 2])
+
+    def test_rows_in_a_phase_run_in_increasing_start_order_across_departments_and_added_rows(self):
+        rows = [{"phase": "P", "start": "2026-12-01", "sample_start": ""}, {"phase": "Q", "start": "2026-01-01", "sample_start": ""},
+                {"phase": "P", "start": "", "sample_start": "2026-10-01"}, {"phase": "P", "start": "2026-11-01", "sample_start": ""}]
+        self.assertEqual([(r["phase"], r["start"] or r["sample_start"]) for r in tc.in_start_order(rows)],
+                         [("P", "2026-10-01"), ("P", "2026-11-01"), ("P", "2026-12-01"), ("Q", "2026-01-01")])
 
     def test_row_25_stays_on_equipment_ordered_and_av_ordered_follows_it(self):
         est = tc.site_estimates("junction")
