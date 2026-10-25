@@ -102,9 +102,10 @@ class TestBuildRows(unittest.TestCase):
     def test_constraint_reads_as_a_duration_after_an_earlier_row(self):
         r = tc.milestone_rules()
         self.assertNotIn("gm-offer-accepted", r)    # the row starts at gm-sourcing, so its duration says 45 days
-        self.assertEqual(r["gm-in-seat"], [("at least 14 days after <<37.1>>", ["37.1"], "requirement"),
-                                           ("14-28 days after <<32>>", [32], "estimate")])
-        self.assertIn(("21 days after <<32.1>>", "preference"), [(t, k) for t, _, k in r["presale-launch"]])
+        self.assertEqual(r["gm-in-seat"], [("14-28 days after <<32>>", [32], "estimate"),
+                                           ("21 days before <<43>>", [], "preference")])
+        self.assertIn(("at least 14 days before <<32.1>>", [], "requirement"), r["presale-kit-ordered"])    # [,-14] has no minimum
+        self.assertFalse(any(k == "preference" for _, _, k in r["presale-launch"]))
         self.assertFalse(any(k == "preference" for key in ("construction-start", "soft-open") for _, _, k in r[key]))
         self.assertIn("at least 10 days after <<26.1>>", [t for t, _, _ in r["construction-start"]])
         self.assertIn("on or after <<26.2>>", [t for t, _, _ in r["construction-start"]])
@@ -209,10 +210,10 @@ class TestBuildRows(unittest.TestCase):
         self.assertEqual(ids["membership-agreement-finalized"], 19)
         self.assertEqual(tc.site_estimates("junction")[37][0], "digital-partner-selected")
         self.assertEqual(tc.extra_milestones("junction")[37][0][1], "presale-kit-ordered")
-        rules = tc.milestone_rules()["vip-start"]
-        refs = {r for text, rows, _ in rules for r in rows}
-        self.assertEqual(refs, {"19", 19, 37, 34} & refs)
-        self.assertTrue({19, 37} <= refs)
+        rules = tc.milestone_rules()
+        for key in ("digital-partner-selected", "membership-agreement-finalized"):
+            self.assertIn(("0-17 days before <<38>>", [], "requirement"), rules[key])    # written from vip-start with a negative duration
+        refs = {r for text, rows, _ in rules["vip-start"] for r in rows}
         self.assertNotIn("37.1", refs)    # the kit order no longer feeds the VIP start
         deps = tc.load_dependencies()
         self.assertEqual(deps[38]["after"], [19, 35, 37])

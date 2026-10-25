@@ -275,8 +275,8 @@ def milestone_rules():
     span_from = {m["key"]: m["span_from"] for m in durations["milestones"] if m.get("span_from")}
     out = {}
     for c in ms.constraints_of(durations):
-        before = c.hi is not None and c.hi <= 0 and c.lo < 0
-        lo, hi = (-c.hi, -c.lo) if before else (c.lo, c.hi)
+        before = c.hi is not None and c.hi <= 0 and (c.lo is None or c.lo < 0)
+        lo, hi = (-c.hi, None if c.lo is None else -c.lo) if before else (c.lo, c.hi)
         span = ("on or" if hi is None and lo == 0 else f"at least {lo} days" if hi is None
                 else f"{lo} days" if hi == lo else f"{lo}-{hi} days")
         frm = ids.get(c.frm)

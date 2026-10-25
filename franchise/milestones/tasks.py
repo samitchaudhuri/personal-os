@@ -86,8 +86,8 @@ def completed(text):
 
 
 def settable(durations):
-    """The milestone keys a site can give a date for, which are its inputs and the ones marked site_can_fix."""
-    return {m["key"] for m in durations["milestones"] if m.get("input") or m.get("site_can_fix")}
+    """The milestone keys a site can give a date for, which are its inputs and the ones marked fixable."""
+    return {m["key"] for m in durations["milestones"] if m.get("input") or m.get("fixable")}
 
 
 def block(lines, start):

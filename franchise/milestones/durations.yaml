@@ -1,34 +1,35 @@
-# Milestones are dated events. Every duration between two of them is a rule "to
-# minus from is within [lo, hi] days", and the range can be negative, such as -21
-# for three weeks before. Keys are the stable names that goals and targets link to
-# in the vault; never rename one without updating those links.
+# Milestones are dated events, and each holds a range of dates. A rule runs from a
+# source milestone, `from`, to a target milestone, `to`, with a duration of
+# `duration_days` [lo, hi]. A positive duration puts the target after the source and a negative one, such as
+# -21 for three weeks before, puts it before. A rule narrows the target and never the source. The terms are
+# explained in the vault's `ULC Milestone Timeline Runbook.md`, and the mechanics are in README.md. Keys are the
+# stable names that goals and targets link to in the vault; never rename one without updating those links.
 # gantt_row is the row in `ULC Los Gatos Opening Timeline.xlsx`, blank where the
 # template has no bar. A milestone with no bar of its own shares the row of the milestone it follows, and the CSV export lists it right after that row. `span_from` names a milestone where the row's bar starts, so the
 # Gantt row runs from that milestone to this one, such as GM sourcing to the accepted offer.
 #
-# Each rule has `from`, `to`, `duration_days` [lo, hi] and a `kind`. An estimate is a
+# Each rule has `from`, `to`, `duration_days` and a `kind`. An estimate is a
 # forecast of how long something takes, such as Fibr's 45 days. A requirement is
 # a duration somebody needs to hold, such as the lease signed within 60 days of the permits. A
 # preference is a duration somebody wants and would give up, such as Michelle Tomko's GM in
 # seat 3 weeks before launch. The generator dates from a preference like a requirement, but
 # a miss is an "ideal missed by N days" warning and not a collision. A
-# `duration_days` pair with hi null, such as [10, null], is a not-before rule: it sets the
-# earliest date and no latest date. A milestone with not-before rules starts as
-# soon as the latest of them allows, so its latest date is the latest of their
-# latest dates. A rule with `check: true` and hi null holds the earliest date only: it is
-# checked and never starts its milestone, so the dates come from the other rules.
+# duration with no maximum is written with a trailing comma, such as [10,], and one with no minimum is
+# written with a leading comma, such as [,-14] for at least 14 days before. A rule with no maximum is a not-before
+# rule: it sets the earliest date and no latest date. A milestone with not-before rules starts as soon as the
+# latest of them allows, so its latest date is the latest of their latest dates, but only when no other rule
+# or site date gives the milestone a latest date.
 #
-# Each milestone is an input or computed. `input: true` means the site must give
+# Each milestone is an input, fixable or computed. `input: true` means the site must give
 # the date in sites.yaml. Any other milestone is computed from the rules, and a
-# date in sites.yaml for it is ignored unless the row has `site_can_fix: true`.
+# date in sites.yaml for it is ignored unless the row has `fixable: true`.
 # Then the date the site gives replaces the estimates that compute it, while
-# requirements on it still apply.
+# the other rules on it still apply.
 #
-# A milestone's range is the intersection of every rule that reaches it, and the
-# rules narrow both ends. When the rules cannot all hold, the generator flags the
-# collision and names the rules. It sets one rule aside to draw the dates: a
-# preference if the collision has one, else a requirement, else the estimate listed last, so put the
-# checks last. A not-before rule is never set aside.
+# A milestone's range is the intersection of every rule that points at it. When
+# the rules cannot all hold, the generator flags the collision and names the rules. It sets one rule
+# aside to draw the dates: a preference if the collision has one, else a requirement, else the estimate
+# listed last. A not-before rule is never set aside.
 #
 # A phase is a rule with a table row of its own, a key and a basis, and the
 # generator also flags any phase whose actual span falls outside its range.
@@ -67,20 +68,20 @@ phases:
 
 constraints:
   - {from: presale-kickoff, to: digital-partner-selected, duration_days: [0, 17], kind: requirement}
-  - {from: digital-partner-selected, to: vip-start, duration_days: [0, 17], kind: requirement}
-  - {from: presale-kickoff, to: presale-kit-ordered, duration_days: [0, null], kind: requirement, check: true}
-  - {from: presale-kit-ordered, to: gm-in-seat, duration_days: [14, null], kind: requirement, check: true}
-  - {from: presale-kit-ordered, to: presale-launch, duration_days: [14, null], kind: requirement, check: true}
+  - {from: vip-start, to: digital-partner-selected, duration_days: [-17, 0], kind: requirement}
+  - {from: presale-kickoff, to: presale-kit-ordered, duration_days: [0,], kind: requirement}
+  - {from: gm-in-seat, to: presale-kit-ordered, duration_days: [,-14], kind: requirement}
+  - {from: presale-launch, to: presale-kit-ordered, duration_days: [,-14], kind: requirement}
   - {from: presale-kickoff, to: membership-agreement-finalized, duration_days: [0, 17], kind: requirement}
-  - {from: membership-agreement-finalized, to: vip-start, duration_days: [0, 17], kind: requirement}
+  - {from: vip-start, to: membership-agreement-finalized, duration_days: [-17, 0], kind: requirement}
   - {from: gm-sourcing, to: gm-offer-accepted, duration_days: [45, 45], kind: estimate}
   - {from: gm-offer-accepted, to: gm-in-seat, duration_days: [14, 28], kind: estimate}
-  - {from: gm-in-seat, to: presale-launch, duration_days: [21, 21], kind: preference}
+  - {from: presale-launch, to: gm-in-seat, duration_days: [-21, -21], kind: preference}
   - {from: lease-signed, to: permits-submitted, duration_days: [0, 60], kind: requirement}
-  - {from: landlord-delivery, to: construction-start, duration_days: [0, null], kind: requirement}
-  - {from: permits-received, to: construction-start, duration_days: [10, null], kind: estimate}
-  - {from: landlord-delivery, to: rent-commences, duration_days: [150, null], kind: requirement}
-  - {from: permits-received, to: rent-commences, duration_days: [150, null], kind: requirement}
+  - {from: landlord-delivery, to: construction-start, duration_days: [0,], kind: requirement}
+  - {from: permits-received, to: construction-start, duration_days: [10,], kind: estimate}
+  - {from: landlord-delivery, to: rent-commences, duration_days: [150,], kind: requirement}
+  - {from: permits-received, to: rent-commences, duration_days: [150,], kind: requirement}
   - {from: construction-start, to: lighting-flooring-delivered, duration_days: [42, 42], kind: estimate}
   - {from: construction-start, to: equipment-installed, duration_days: [91, 91], kind: estimate}
   - {from: equipment-installed, to: av-ordered, duration_days: [-84, -84], kind: estimate}
@@ -100,19 +101,19 @@ milestones:
   - key: digital-partner-selected
     label: Digital partner selected
     gantt_row: 37
-    site_can_fix: true
+    fixable: true
     basis: Elise Budowanec's 10/9 follow-up asks Samit to pick one of three approved local agencies, PRSPR, 5th Element or JL Marketing, by 10/23 to launch campaigns on 10/26. It has to land between the kickoff and the VIP start
 
   - key: presale-kit-ordered
     label: Presale marketing kit ordered
     gantt_row: 37
-    site_can_fix: true
-    basis: The 10/9 kickoff deck lists the kit as a Sales & Operations next step. We control the order and not the delivery. Elise said on the 10/21 call that the lead time is 2 weeks, that the kit is needed for grassroots events and that it can arrive early and wait in the garage. Samit wants the order at least 2 weeks before the GM is in seat or any grassroots event. The order no longer has to come before the VIP start, because the kit is not needed for it. The model backs the date out from the GM in seat and from presale launch with two requirements of at least 14 days marked `check`, which move no date, so the window runs from the kickoff to the latest date both allow. The grassroots events have no milestone, so they are not checked
+    fixable: true
+    basis: The 10/9 kickoff deck lists the kit as a Sales & Operations next step. We control the order and not the delivery. Elise said on the 10/21 call that the lead time is 2 weeks, that the kit is needed for grassroots events and that it can arrive early and wait in the garage. Samit wants the order at least 2 weeks before the GM is in seat or any grassroots event. The order no longer has to come before the VIP start, because the kit is not needed for it. The model backs the date out from the GM in seat and from presale launch with two requirements of at least 14 days, so the window runs from the kickoff to the latest date both allow. The grassroots events have no milestone, so they are not checked
 
   - key: membership-agreement-finalized
     label: Membership agreement finalized
     gantt_row: 19
-    site_can_fix: true
+    fixable: true
     basis: The membership agreement is final once ULC approves the attorney redline of the California template, so it can be loaded into Kite. Presale cannot sell memberships without it, and it has to land between the kickoff and the VIP start. The 0 to 17 day range from the kickoff is a placeholder from the review-only version of this milestone and still needs a duration that fits the redline and ULC approval
 
   - key: lease-signed
@@ -136,7 +137,7 @@ milestones:
   - key: gm-in-seat
     label: GM in seat
     gantt_row: 32
-    basis: Two to four weeks of notice between the accepted offer and the start date, and Michelle Tomko prefers the GM in seat 3 weeks before presale launch, which is an ideal and not a hard requirement. Corporate reviews the GM's goals weekly
+    basis: Two to four weeks of notice between the accepted offer and the start date, and Michelle Tomko prefers the GM in seat 3 weeks before presale launch, which is an ideal and not a hard requirement. Launch comes from the VIP start, so this date is the hiring target backed out from launch. Corporate reviews the GM's goals weekly
 
   - key: construction-documents-complete
     label: Construction documents complete
@@ -153,13 +154,13 @@ milestones:
   - key: permits-submitted
     label: Permits submitted
     gantt_row: 26
-    site_can_fix: true
+    fixable: true
     basis: The Counter LOI gives 60 days after the lease to submit
 
   - key: permits-received
     label: Permits issued
     gantt_row: 26
-    site_can_fix: true
+    fixable: true
     basis: Permits submitted plus the city review phase of 46 to 56 days
 
   - key: landlord-delivery
@@ -216,13 +217,13 @@ milestones:
   - key: vip-start
     label: Pre-booking starts, VIP list opens
     gantt_row: 38
-    site_can_fix: true
+    fixable: true
     basis: Presale kickoff plus the set up phase of 14 to 17 days
 
   - key: presale-launch
     label: Membership sales start, presale launch
     gantt_row: 43
-    site_can_fix: true
+    fixable: true
     basis: VIP start plus the pre-booking phase of 42 to 56 days
 
   - key: grand-opening

@@ -32,26 +32,35 @@ def synthetic(constraints, events, **fixed):
 
 
 def c(frm, to, lo, hi, kind="estimate"):
-    return {"from": frm, "to": to, "duration_days": [lo, hi], "kind": kind}
+    """A rule; hi None writes the duration as [lo,] with no maximum, and lo None as [,hi] with no minimum."""
+    return {"from": frm, "to": to, "duration_days": [lo] if hi is None else [lo, hi], "kind": kind}
 
 
-class TestCheckRule(unittest.TestCase):
-    def solve(self, check):
-        rule = dict(c("a", "b", 14, None, "requirement"), check=check)
-        d = synthetic([c("s", "a", 0, 5), c("s", "b", 30, 40), rule], ["s", "a", "b"], s=1)
-        return ms.resolve(d, {"s": D(2026, 1, 1)})
+class TestNotBeforeStart(unittest.TestCase):
+    def solve(self, *extra):
+        d = synthetic([c("s", "a", 0, 5), c("a", "b", 14, None, "requirement"), *extra], ["s", "a", "b"], s=1)
+        return ms.solve(d, {"s": D(2026, 1, 1)})
 
-    def test_a_check_leaves_the_milestone_where_the_other_rules_put_it(self):
-        self.assertEqual(self.solve(True)["b"], (D(2026, 1, 31), D(2026, 2, 10)))
+    def test_a_not_before_rule_starts_its_target_as_soon_as_it_allows(self):
+        self.assertEqual(self.solve().ranges["b"], (D(2026, 1, 15), D(2026, 1, 20)))
 
-    def test_without_check_the_not_before_rule_starts_the_milestone(self):
-        self.assertEqual(self.solve(False)["b"], (D(2026, 1, 15), D(2026, 1, 20)))
+    def test_another_rule_with_a_latest_date_stops_the_start(self):
+        s = self.solve(c("s", "b", 30, 40))
+        self.assertEqual(s.ranges["b"], (D(2026, 1, 31), D(2026, 2, 10)))
+        self.assertEqual(s.conflicts, [])
+
+    def test_an_open_minimum_bounds_the_latest_date_and_stops_the_start(self):
+        # b is at least 14 days before g, so it ends 14 days before g's latest date, and it never starts at once.
+        s = ms.solve(synthetic([c("s", "b", 0, None), c("g", "b", None, -14), c("s", "g", 30, 40)],
+                               ["s", "g", "b"], s=1), {"s": D(2026, 1, 1)})
+        self.assertEqual(s.ranges["b"], (D(2026, 1, 1), D(2026, 1, 27)))
+        self.assertEqual(s.ranges["g"], (D(2026, 1, 31), D(2026, 2, 10)))
 
 
 class TestResolve(unittest.TestCase):
     def test_inputs_pass_through(self):
         r = junction()
-        self.assertEqual(r["lease-signed"], (D(2026, 11, 30), D(2026, 12, 14)))
+        self.assertEqual(r["lease-signed"], (D(2026, 11, 30), D(2026, 12, 15)))
         self.assertEqual(r["presale-kickoff"], (D(2026, 10, 9), D(2026, 10, 9)))
 
     def test_sourcing_is_a_site_input(self):
@@ -94,7 +103,7 @@ class TestResolve(unittest.TestCase):
 
     def test_new_equipment_milestones_add_no_flags_or_collisions(self):
         sol = ms.solve(DURATIONS, JUNCTION["inputs"])
-        self.assertEqual([k.set_aside.name for k in sol.conflicts], ["gm-in-seat to presale-launch"])
+        self.assertEqual([k.set_aside.name for k in sol.conflicts], ["presale-launch to gm-in-seat"])
 
     def test_permit_review_follows_submission(self):
         r = junction()
@@ -138,13 +147,12 @@ class TestResolve(unittest.TestCase):
 
     def test_permits_submitted_within_60_days_of_lease(self):
         inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "permits-submitted"}
-        # 60 days after the latest lease is 2/13, but soft open must stay within 180 days of the
-        # latest launch, and that pulls the latest submission back to 1/23.
-        self.assertEqual(ms.resolve(DURATIONS, inputs)["permits-submitted"], (D(2026, 11, 30), D(2027, 1, 23)))
+        # 60 days after the latest lease is 2/13, and no rule points back at the submission to pull it earlier.
+        self.assertEqual(ms.resolve(DURATIONS, inputs)["permits-submitted"], (D(2026, 11, 30), D(2027, 2, 13)))
 
-    def test_site_fixed_submission_narrows_the_lease_backward(self):
-        # Submission fixed on 12/14 within 0 to 60 days of the lease means the lease is signed by 12/14.
-        self.assertEqual(junction()["lease-signed"][1], D(2026, 12, 14))
+    def test_site_fixed_submission_leaves_the_lease_range_alone(self):
+        # The rule runs from the lease to the submission, so a submission fixed on 12/14 does not narrow the lease.
+        self.assertEqual(junction()["lease-signed"], (D(2026, 11, 30), D(2026, 12, 15)))
 
     def test_forward_chain_from_presale_kickoff(self):
         r = junction()
@@ -173,19 +181,20 @@ class TestResolve(unittest.TestCase):
         too_late = ms.solve(DURATIONS, dict(JUNCTION["inputs"], **{key: D(2026, 12, 10)}))
         self.assertIn("requirement", [k.set_aside.kind for k in too_late.conflicts])
 
-    def test_a_prerequisite_the_site_dates_inside_the_window_narrows_vip_start(self):
+    def test_a_prerequisite_the_site_dates_inside_the_window_leaves_vip_start_alone(self):
         inputs = dict(JUNCTION["inputs"], **{"membership-agreement-finalized": D(2026, 10, 24)})
         s = ms.solve(DURATIONS, inputs)
         self.assertEqual([k for k in s.conflicts if not k.soft], [])
-        self.assertEqual(s.ranges["vip-start"], (D(2026, 10, 24), D(2026, 10, 26)))
+        self.assertEqual(s.ranges["vip-start"], (D(2026, 10, 23), D(2026, 10, 26)))
+        self.assertEqual(s.ranges["membership-agreement-finalized"], (D(2026, 10, 24), D(2026, 10, 24)))
 
-    def test_kickoff_slip_moves_vip_and_launch_and_the_gm_requirement_pulls_them_later(self):
+    def test_kickoff_slip_moves_vip_and_launch_and_the_gm_target_follows_launch(self):
         # Kickoff 10/14 gives VIP 10/28 to 10/31 and launch 12/09 to 12/26 from the durations alone.
-        # Launch can only be met by the GM at 12/25 or later, so the requirement trims both ranges.
+        # The GM preference runs from launch to the GM, so it leaves both ranges alone and dates the GM back from launch.
         inputs = dict(JUNCTION["inputs"], **{"presale-kickoff": D(2026, 10, 14)})
         s = ms.solve(DURATIONS, inputs)
-        self.assertEqual(s.ranges["vip-start"], (D(2026, 10, 30), D(2026, 10, 31)))
-        self.assertEqual(s.ranges["presale-launch"], (D(2026, 12, 25), D(2026, 12, 26)))
+        self.assertEqual(s.ranges["vip-start"], (D(2026, 10, 28), D(2026, 10, 31)))
+        self.assertEqual(s.ranges["presale-launch"], (D(2026, 12, 9), D(2026, 12, 26)))
         self.assertEqual(s.conflicts, [])
 
     def test_site_fixed_date_replaces_the_estimates(self):
@@ -228,24 +237,23 @@ class TestConstraintModel(unittest.TestCase):
         r = ms.resolve(off, {"a": D(2026, 1, 1), "z": [D(2026, 1, 10), D(2026, 1, 14)]})
         self.assertEqual(r["b"], (D(2026, 1, 15), D(2026, 1, 21)))
 
-    def test_constraints_narrow_the_earlier_event_backward(self):
-        # b is fixed 1/20 to 1/25 and sits 10 to 15 days after a, so a is 1/5 to 1/15, not 1/1 to 1/31.
+    def test_a_rule_narrows_its_target_and_never_its_source(self):
+        # b is fixed 1/20 to 1/25 and sits 10 to 15 days after a, which still allows every date a was given.
         off = synthetic([c("a", "b", 10, 15)], ["a", "b"], a=1, b=1)
         r = ms.resolve(off, {"a": [D(2026, 1, 1), D(2026, 1, 31)], "b": [D(2026, 1, 20), D(2026, 1, 25)]})
-        self.assertEqual(r["a"], (D(2026, 1, 5), D(2026, 1, 15)))
+        self.assertEqual(r["a"], (D(2026, 1, 1), D(2026, 1, 31)))
+        self.assertEqual(r["b"], (D(2026, 1, 20), D(2026, 1, 25)))
 
     def test_negative_range_puts_the_event_before(self):
         off = synthetic([c("launch", "gm", -21, -21)], ["launch", "gm"], launch=1)
         r = ms.resolve(off, {"launch": D(2026, 12, 21)})
         self.assertEqual(r["gm"], (D(2026, 11, 30), D(2026, 11, 30)))
 
-    def test_gm_requirement_narrows_launch_given_the_gm_and_the_gm_given_launch(self):
-        off = synthetic([c("gm", "launch", 21, 21, "requirement")], ["gm", "launch"], gm=1)
-        self.assertEqual(ms.resolve(off, {"gm": [D(2026, 12, 4), D(2026, 12, 18)]})["launch"],
-                         (D(2026, 12, 25), D(2027, 1, 8)))
-        off = synthetic([c("gm", "launch", 21, 21, "requirement")], ["gm", "launch"], launch=1)
-        self.assertEqual(ms.resolve(off, {"launch": [D(2026, 12, 25), D(2027, 1, 8)]})["gm"],
-                         (D(2026, 12, 4), D(2026, 12, 18)))
+    def test_a_requirement_dates_launch_from_the_gm_and_leaves_the_gm_alone(self):
+        off = synthetic([c("gm", "launch", 21, 21, "requirement")], ["gm", "launch"], gm=1, launch=1)
+        r = ms.resolve(off, {"gm": [D(2026, 12, 4), D(2026, 12, 18)], "launch": [D(2026, 12, 1), D(2027, 1, 31)]})
+        self.assertEqual(r["launch"], (D(2026, 12, 25), D(2027, 1, 8)))
+        self.assertEqual(r["gm"], (D(2026, 12, 4), D(2026, 12, 18)))
 
     def test_not_before_takes_the_latest_lower_bound_and_starts_as_soon_as_allowed(self):
         off = synthetic([c("a", "x", 0, None), c("b", "x", 10, None)], ["a", "b", "x"], a=1, b=1)
@@ -263,14 +271,14 @@ class TestConstraintModel(unittest.TestCase):
         self.assertEqual(len(s.conflicts), 1)
         k = s.conflicts[0]
         self.assertEqual(k.short, 4)
-        self.assertEqual(k.set_aside.name, "gm-in-seat to presale-launch")
+        self.assertEqual(k.set_aside.name, "presale-launch to gm-in-seat")
         names = {x.name for x in k.constraints}
-        self.assertIn("gm-in-seat to presale-launch", names)
+        self.assertIn("presale-launch to gm-in-seat", names)
         self.assertIn("gm-sourcing to gm-offer-accepted", names)
         self.assertTrue(k.soft)
-        self.assertIn("Ideal missed by 4 days: the preference gm-in-seat to presale-launch", k.message)
+        self.assertIn("Ideal missed by 4 days: the preference presale-launch to gm-in-seat", k.message)
         self.assertIn("improved by 4 days in total", k.message)
-        for date in ("2026-12-21", "2026-11-30", "2026-11-16", "2026-11-20"):
+        for date in ("2026-11-30", "2026-11-20", "2026-12-04", "2026-12-21"):
             self.assertIn(date, k.message)
 
     def test_conflict_shows_the_estimates_without_the_requirement(self):
@@ -291,6 +299,45 @@ class TestConstraintModel(unittest.TestCase):
         self.assertEqual(s.conflicts, [])
         self.assertEqual(s.ranges["launch"], (D(2026, 1, 22), D(2026, 1, 22)))
 
+    def test_a_negative_preference_dates_its_target_back_from_its_source_and_never_moves_the_source(self):
+        # b is 10 to 20 days after a, and the GM-style preference wants c 3 days before b.
+        off = synthetic([c("a", "b", 10, 20), c("a", "c", 0, 60), c("b", "c", -3, -3, "preference")],
+                        ["a", "b", "c"], a=1)
+        s = ms.solve(off, {"a": D(2026, 1, 1)})
+        self.assertEqual(s.conflicts, [])
+        self.assertEqual(s.ranges["b"], (D(2026, 1, 11), D(2026, 1, 21)))
+        self.assertEqual(s.ranges["c"], (D(2026, 1, 8), D(2026, 1, 18)))
+
+    def test_a_late_target_cannot_push_the_source_later(self):
+        # c cannot be before 1/20, but the preference wants it 3 days before b, which is no later than 1/21, so the
+        # preference is the rule that gives and b keeps its dates.
+        off = synthetic([c("a", "b", 10, 20), c("a", "c", 19, 40), c("b", "c", -3, -3, "preference")],
+                        ["a", "b", "c"], a=1)
+        s = ms.solve(off, {"a": D(2026, 1, 1)})
+        self.assertEqual(s.ranges["b"], (D(2026, 1, 11), D(2026, 1, 21)))
+        self.assertEqual(s.ranges["c"][0], D(2026, 1, 20))
+        self.assertEqual([(k.set_aside.name, k.soft) for k in s.conflicts], [("b to c", True)])
+
+    def test_a_duration_with_no_maximum_is_written_with_a_trailing_comma(self):
+        rule = ms.constraints_of(synthetic([c("a", "b", 14, None)], ["a", "b"]))[0]
+        self.assertEqual((rule.lo, rule.hi, rule.pins), (14, None, True))
+
+    def test_a_duration_with_null_is_an_error(self):
+        bad = synthetic([dict(c("a", "b", 14, 20), duration_days=[14, None])], ["a", "b"])
+        with self.assertRaises(ValueError):
+            ms.constraints_of(bad)
+
+    def test_a_duration_with_no_minimum_is_written_with_a_leading_comma(self):
+        loaded = ms.parse_yaml("constraints:\n  - {from: g, to: k, duration_days: [,-14], kind: requirement}\n")
+        self.assertEqual(loaded["constraints"][0]["duration_days"], [None, -14])
+        rule = ms.constraints_of(synthetic(loaded["constraints"], ["g", "k"]))[0]
+        self.assertEqual((rule.lo, rule.hi, rule.pins), (None, -14, False))
+
+    def test_a_duration_with_no_limits_is_an_error(self):
+        bad = synthetic([dict(c("a", "b", 1, 2), duration_days=[None])], ["a", "b"])
+        with self.assertRaises(ValueError):
+            ms.constraints_of(bad)
+
     def test_requirement_met_means_no_conflict(self):
         inputs = dict(JUNCTION["inputs"], **{"gm-sourcing": D(2026, 10, 2)})
         self.assertEqual(ms.solve(DURATIONS, inputs).conflicts, [])
@@ -303,7 +350,7 @@ class TestConstraintModel(unittest.TestCase):
         self.assertEqual(s.ranges["b"], (D(2026, 1, 11), D(2026, 1, 11)))
 
     def test_loop_without_dates_names_the_constraints(self):
-        off = synthetic([c("a", "b", 5, 5, "requirement"), c("b", "a", 0, 0)], ["a", "b"])
+        off = synthetic([c("a", "b", 5, 5, "requirement"), c("b", "a", 0, 0), c("a", "b", 0, 100)], ["a", "b"])
         off["milestones"][0]["input"] = True
         s = ms.solve(off, {"a": D(2026, 1, 1)})
         self.assertEqual(len(s.conflicts), 1)
@@ -359,8 +406,8 @@ class TestConflictFlags(unittest.TestCase):
     def test_flag_names_both_constraints_and_the_days(self):
         s = ms.solve(DURATIONS, JUNCTION["inputs"])
         key, msg = s.conflicts[0].key, s.conflicts[0].message
-        self.assertEqual(key, "presale-launch")
-        self.assertIn("gm-in-seat to presale-launch", msg)
+        self.assertEqual(key, "gm-in-seat")
+        self.assertIn("presale-launch to gm-in-seat", msg)
         self.assertIn("gm-sourcing to gm-offer-accepted", msg)
         self.assertIn("4 days", msg)
 
@@ -400,9 +447,9 @@ class TestInputRows(unittest.TestCase):
 class TestSetAsideRows(unittest.TestCase):
     def test_lists_the_preference_set_aside_and_what_it_collides_with(self):
         rule, kind, others, short = ms.set_aside_rows(ms.solve(DURATIONS, JUNCTION["inputs"]).conflicts)[0]
-        self.assertEqual((rule, kind, short), ("gm-in-seat to presale-launch", "preference", 4))
+        self.assertEqual((rule, kind, short), ("presale-launch to gm-in-seat", "preference", 4))
         self.assertIn("gm-sourcing to gm-offer-accepted", others)
-        self.assertNotIn("gm-in-seat to presale-launch", others)
+        self.assertNotIn("presale-launch to gm-in-seat", others)
 
     def test_rows_follow_the_order_ignored(self):
         inputs = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 5, 1)})
@@ -470,7 +517,8 @@ class TestRender(unittest.TestCase):
         self.assertEqual(rows["soft-open"][3], "computed")
 
     def test_a_narrowed_input_also_shows_the_range_the_site_gave(self):
-        rows = {r[0]: r for r in ms.milestone_rows(DURATIONS, junction(), JUNCTION)}
+        narrowed = dict(junction(), **{"lease-signed": (D(2026, 11, 30), D(2026, 12, 14))})
+        rows = {r[0]: r for r in ms.milestone_rows(DURATIONS, narrowed, JUNCTION)}
         self.assertEqual(rows["lease-signed"][3], "estimated, given 2026-11-30 to 2026-12-15")
 
     def test_point_and_range_formats(self):
@@ -483,7 +531,7 @@ class TestSections(unittest.TestCase):
         text = ms.render_sections(DURATIONS, JUNCTION, ms.solve(DURATIONS, JUNCTION["inputs"]))
         heads = [l for l in text.splitlines() if l.startswith("#### ")]
         self.assertEqual(heads, ["#### Milestones", "#### Flags"])
-        self.assertIn("- `gm-in-seat to presale-launch` (preference) was set aside, 4 days short", text)
+        self.assertIn("- `presale-launch to gm-in-seat` (preference) was set aside, 4 days short", text)
 
     def test_flags_heading_is_left_out_when_nothing_is_off(self):
         text = ms.render_sections(DURATIONS, JUNCTION, ms.Solution(junction(), [], set()))

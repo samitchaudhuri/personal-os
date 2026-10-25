@@ -75,7 +75,7 @@ SITES = """sites:
       tasks: x
 """
 DURATIONS = {"milestones": [{"key": "presale-kickoff", "input": True}, {"key": "bid-complete", "input": True},
-                            {"key": "vip-start", "site_can_fix": True}, {"key": "permits-received"}]}
+                            {"key": "vip-start", "fixable": True}, {"key": "permits-received"}]}
 DONE = NOTE + "\n- [x] #task **Kit** [milestone:: vip-start] #task/admin 🆔 kit 📅 2026-10-26 ✅ 2026-10-21"
 
 
