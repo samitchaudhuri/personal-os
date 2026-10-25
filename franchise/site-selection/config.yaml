@@ -66,6 +66,8 @@ site_names:
   first-retail-center: "First Retail Center"
   gateway-crossing-orlo: "Gateway Crossing Orlo"
   prado: "Prado"
+  throckmorton: "Throckmorton"
+  strawberry_village: "Strawberry Village"
 
 # Unit economics model runner (site_model.py). Each center's model is a copy
 # of the current Baseline with only the site cells below changed. Site facts
