@@ -161,7 +161,7 @@ milestones:
     label: Permits issued
     gantt_row: 26
     fixable: true
-    basis: Permits submitted plus the city review phase of 46 to 56 days
+    basis: Permits submitted plus the city review phase
 
   - key: landlord-delivery
     label: Landlord delivers the suite
@@ -172,12 +172,12 @@ milestones:
   - key: construction-start
     label: Buildout starts
     gantt_row: 27
-    basis: Starts on the later of landlord delivery and 10 days after permits are issued, the gap Vision Track leaves between 1/29 and 2/8
+    basis: Starts on the later of landlord delivery and the gap after permits are issued that Vision Track leaves between 1/29 and 2/8
 
   - key: rent-commences
     label: Rent commences
     gantt_row:
-    basis: The Counter LOI starts rent 150 days after the later of permit receipt and delivery
+    basis: The Counter LOI starts rent a fixed span after the later of permit receipt and delivery
 
   - key: lighting-flooring-delivered
     label: Lighting and flooring delivered
@@ -212,21 +212,21 @@ milestones:
   - key: soft-open
     label: Soft open
     gantt_row: 49
-    basis: One week after the certificate of occupancy, the template's gap between its 15 and 16 weeks, so 13 to 15 weeks after construction starts
+    basis: One week after the certificate of occupancy, the template's gap between its 15 and 16 weeks of build
 
   - key: vip-start
     label: Pre-booking starts, VIP list opens
     gantt_row: 38
     fixable: true
-    basis: Presale kickoff plus the set up phase of 14 to 17 days
+    basis: Presale kickoff plus the set up phase
 
   - key: presale-launch
     label: Membership sales start, presale launch
     gantt_row: 43
     fixable: true
-    basis: VIP start plus the pre-booking phase of 42 to 56 days
+    basis: VIP start plus the pre-booking phase
 
   - key: grand-opening
     label: Grand opening
     gantt_row:
-    basis: Six to eight weeks after soft open
+    basis: Follows soft open by the duration of the rule from soft open to grand opening

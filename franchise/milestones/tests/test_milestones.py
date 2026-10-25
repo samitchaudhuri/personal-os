@@ -5,6 +5,7 @@ vault, Google Drive or Excel; the rewrite test works on a temp file.
 """
 import datetime
 import os
+import re
 import sys
 import tempfile
 import unittest
@@ -361,6 +362,13 @@ class TestConstraintModel(unittest.TestCase):
         self.assertIn("presale-membership-sales", [k.set_aside.name for k in s.conflicts])
         self.assertEqual(s.ranges["presale-launch"], junction()["presale-launch"])
         self.assertIn("presale-membership-sales", s.set_aside_phases)
+
+
+class TestBasisText(unittest.TestCase):
+    def test_a_basis_names_a_phase_and_never_copies_its_length(self):
+        # The length lives in the phase's duration_days, so a copy in a basis would drift when it changes.
+        copies = [m["key"] for m in DURATIONS["milestones"] if re.search(r"phase of \d", m["basis"])]
+        self.assertEqual(copies, [])
 
 
 class TestMonthsOver(unittest.TestCase):
