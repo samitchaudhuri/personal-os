@@ -187,17 +187,17 @@ milestones:
   - key: equipment-installed
     label: Equipment install starts
     gantt_row: 29
-    basis: Template starts install 13 weeks into the build and finishes it the week of 2/24, to confirm with MMP. The A/V package must arrive by this date, and the millwork and lighting system is ordered separately
+    basis: Template starts install 13 weeks into the build and finishes it the week of 2/24, to confirm with Jason Park and Kaleb Ballard. The A/V package must arrive by this date, and the millwork and lighting system is ordered separately
 
   - key: equipment-ordered
     label: Equipment ordered and invoice paid
     gantt_row: 25
-    basis: Don Michael said on 10/14 that the equipment invoice, $478K, is paid 45 to 60 days before soft open. Samit's position is that the invoice is paid before the order is placed, so one date stands for both, and the funding ramp draws from it. It is open whether the invoice includes A/V and millwork or equipment alone. The template's row 25 orders earlier, before construction starts, because it follows the A/V lead time, which this table carries as A/V ordered
+    basis: Don Michael said on 10/14 that the equipment invoice, $478K, is paid 45 to 60 days before soft open. Samit's position is that the invoice is paid before the order is placed, so one date stands for both, and the funding ramp draws from it. Invoice 1029 has no A/V line and no millwork, so it covers equipment and shipping only. The template's row 25 orders earlier, before construction starts, because it follows the A/V lead time, which this table carries as A/V ordered
 
   - key: av-ordered
     label: A/V ordered
     gantt_row: 25
-    basis: The franchisor template gives the A/V package a 12-week lead time, 84 days, before install. No vendor has confirmed it, so it stays an estimate until MMP does, and it is open whether the 84 days run from this order or from payment
+    basis: The franchisor template gives the A/V package a 12-week lead time, 84 days, before install. No vendor has confirmed it, so it stays an estimate until Jason Park and Kaleb Ballard do, and it is open whether the 84 days run from this order or from payment
 
   - key: millwork-lighting-ordered
     label: Millwork and lighting system ordered and paid
