@@ -61,7 +61,7 @@ class TestNotBeforeStart(unittest.TestCase):
 class TestResolve(unittest.TestCase):
     def test_inputs_pass_through(self):
         r = junction()
-        self.assertEqual(r["lease-signed"], (D(2026, 11, 30), D(2026, 12, 15)))
+        self.assertEqual(r["lease-signed"], (D(2026, 12, 14), D(2026, 12, 29)))
         self.assertEqual(r["presale-kickoff"], (D(2026, 10, 9), D(2026, 10, 9)))
 
     def test_sourcing_is_a_site_input(self):
@@ -148,12 +148,12 @@ class TestResolve(unittest.TestCase):
 
     def test_permits_submitted_within_60_days_of_lease(self):
         inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "permits-submitted"}
-        # 60 days after the latest lease is 2/13, and no rule points back at the submission to pull it earlier.
-        self.assertEqual(ms.resolve(DURATIONS, inputs)["permits-submitted"], (D(2026, 11, 30), D(2027, 2, 13)))
+        # 60 days after the latest lease is 2/27, and no rule points back at the submission to pull it earlier.
+        self.assertEqual(ms.resolve(DURATIONS, inputs)["permits-submitted"], (D(2026, 12, 14), D(2027, 2, 27)))
 
     def test_site_fixed_submission_leaves_the_lease_range_alone(self):
         # The rule runs from the lease to the submission, so a submission fixed on 12/14 does not narrow the lease.
-        self.assertEqual(junction()["lease-signed"], (D(2026, 11, 30), D(2026, 12, 15)))
+        self.assertEqual(junction()["lease-signed"], (D(2026, 12, 14), D(2026, 12, 29)))
 
     def test_forward_chain_from_presale_kickoff(self):
         r = junction()
@@ -388,7 +388,8 @@ class TestFlags(unittest.TestCase):
 
     def test_junction_flags_extension_and_opening_fee(self):
         m = self.messages(junction())
-        self.assertIn("one-time 90-day extension", m["lease-signed"])
+        lease = [t for k, t in ms.flags(junction(), JUNCTION["limits"], AWAY) if k == "lease-signed"]
+        self.assertTrue(any("one-time 90-day extension" in t for t in lease))
         self.assertIn("1 months past", m["soft-open"])
         self.assertIn("$2,500", m["soft-open"])
         self.assertIn("hard stop", m["gm-in-seat"])
@@ -430,7 +431,7 @@ class TestInputRows(unittest.TestCase):
         by_key = {r[0]: r for r in rows}
         self.assertEqual(by_key["landlord-delivery"][2:4], ((D(2027, 2, 8), D(2027, 2, 8)), "assumed"))
         self.assertEqual(by_key["presale-kickoff"][3], "committed")
-        self.assertEqual(by_key["lease-signed"][2:4], ((D(2026, 11, 30), D(2026, 12, 15)), "estimated"))
+        self.assertEqual(by_key["lease-signed"][2:4], ((D(2026, 12, 14), D(2026, 12, 29)), "estimated"))
 
     def test_rows_follow_milestone_order(self):
         keys = [r[0] for r in self.rows()]
@@ -525,9 +526,9 @@ class TestRender(unittest.TestCase):
         self.assertEqual(rows["soft-open"][3], "computed")
 
     def test_a_narrowed_input_also_shows_the_range_the_site_gave(self):
-        narrowed = dict(junction(), **{"lease-signed": (D(2026, 11, 30), D(2026, 12, 14))})
+        narrowed = dict(junction(), **{"lease-signed": (D(2026, 12, 14), D(2026, 12, 20))})
         rows = {r[0]: r for r in ms.milestone_rows(DURATIONS, narrowed, JUNCTION)}
-        self.assertEqual(rows["lease-signed"][3], "estimated, given 2026-11-30 to 2026-12-15")
+        self.assertEqual(rows["lease-signed"][3], "estimated, given 2026-12-14 to 2026-12-29")
 
     def test_point_and_range_formats(self):
         self.assertEqual(ms.fmt((D(2026, 11, 30), D(2026, 11, 30))), "2026-11-30")
