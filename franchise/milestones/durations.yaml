@@ -38,9 +38,9 @@ phases:
     label: City permit review
     start: permits-submitted
     end: permits-received
-    duration_days: [46, 56]
+    duration_days: [42, 49]
     kind: estimate
-    basis: Vision Track plans 46 days from 12/14 to 1/29, and Jason Park quoted about 8 weeks, 56 days, for the initial review in San Diego, Boston and Miami, which are the national worst cases; the regulatory assessment file due 10/23 gives the Los Gatos estimate
+    basis: Donna Elliott of RRMM said on 11/3 that the city's initial review takes 4 to 5 weeks and each round of comments takes 2 weeks, which gives 6 to 7 weeks with one round. Vision Track planned 46 days and Jason Park quoted about 8 weeks, 56 days, for the initial review in San Diego, Boston and Miami, which are the national worst cases
 
   - key: presale-setup
     label: Presale set up
@@ -77,9 +77,11 @@ constraints:
   - {from: gm-sourcing, to: gm-offer-accepted, duration_days: [45, 45], kind: estimate}
   - {from: gm-offer-accepted, to: gm-in-seat, duration_days: [14, 28], kind: estimate}
   - {from: presale-launch, to: gm-in-seat, duration_days: [-21, -21], kind: preference}
+  - {from: architect-start, to: construction-documents-complete, duration_days: [28, 28], kind: estimate}
+  - {from: construction-documents-complete, to: permits-submitted, duration_days: [0, 0], kind: estimate}
   - {from: lease-signed, to: permits-submitted, duration_days: [0, 60], kind: requirement}
   - {from: landlord-delivery, to: construction-start, duration_days: [0,], kind: requirement}
-  - {from: permits-received, to: construction-start, duration_days: [10,], kind: estimate}
+  - {from: permits-received, to: construction-start, duration_days: [7,], kind: estimate}
   - {from: landlord-delivery, to: rent-commences, duration_days: [150,], kind: requirement}
   - {from: permits-received, to: rent-commences, duration_days: [150,], kind: requirement}
   - {from: construction-start, to: lighting-flooring-delivered, duration_days: [42, 42], kind: estimate}
@@ -139,11 +141,15 @@ milestones:
     gantt_row: 32
     basis: Two to four weeks of notice between the accepted offer and the start date, and Michelle Tomko prefers the GM in seat 3 weeks before presale launch, which is an ideal and not a hard requirement. Launch comes from the VIP start, so this date is the hiring target backed out from launch. Corporate reviews the GM's goals weekly
 
+  - key: architect-start
+    label: Architect starts
+    input: true
+    basis: The architect starts once the pick is made, the contract is signed, and the new Design Intent Plan and the revised space plan are in, since every architect needs both. Donna Elliott said on 11/3 that the DIP is expected the week of 11/9
+
   - key: construction-documents-complete
     label: Construction documents complete
     gantt_row: 22
-    input: true
-    basis: Vision Track shows construction documents from 11/26 to 12/4 in the 10/14 walkthrough with Jason Park, and the architect starts from the space plan and site survey report due 10/23
+    basis: Donna Elliott of RRMM said on 11/3 that construction documents take 4 weeks from the start, 28 days. Vision Track showed 11/26 to 12/4 on 10/14, before the HBOT room changed the space plan
 
   - key: bid-complete
     label: GC bids received
@@ -155,7 +161,7 @@ milestones:
     label: Permits submitted
     gantt_row: 26
     fixable: true
-    basis: The Counter LOI gives 60 days after the lease to submit
+    basis: Submitted the day construction documents are complete, and the Counter LOI gives 60 days after the lease to submit
 
   - key: permits-received
     label: Permits issued
@@ -172,7 +178,7 @@ milestones:
   - key: construction-start
     label: Buildout starts
     gantt_row: 27
-    basis: Starts on the later of landlord delivery and the gap after permits are issued that Vision Track leaves between 1/29 and 2/8
+    basis: Starts on the later of landlord delivery and GC mobilization after permits are issued, which takes a week to buy materials and schedule subcontractors, per Samit. Vision Track left 10 days between 1/29 and 2/8
 
   - key: rent-commences
     label: Rent commences

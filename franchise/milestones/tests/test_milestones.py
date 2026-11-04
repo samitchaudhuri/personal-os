@@ -76,13 +76,13 @@ class TestResolve(unittest.TestCase):
     def test_forward_chain_uses_template_durations(self):
         r = junction()
         rg = lambda a, b: (D(*a), D(*b))
-        self.assertEqual(r["construction-start"], rg((2027, 2, 8), (2027, 2, 18)))
-        self.assertEqual(r["lighting-flooring-delivered"], rg((2027, 3, 22), (2027, 4, 1)))
-        self.assertEqual(r["equipment-installed"], rg((2027, 5, 10), (2027, 5, 20)))
-        self.assertEqual(r["av-ordered"], rg((2027, 2, 15), (2027, 2, 25)))
-        self.assertEqual(r["equipment-ordered"], rg((2027, 3, 11), (2027, 4, 19)))
-        self.assertEqual(r["build-complete"], rg((2027, 5, 3), (2027, 5, 27)))
-        self.assertEqual(r["soft-open"], rg((2027, 5, 10), (2027, 6, 3)))
+        self.assertEqual(r["construction-start"], rg((2027, 2, 9), (2027, 2, 16)))
+        self.assertEqual(r["lighting-flooring-delivered"], rg((2027, 3, 23), (2027, 3, 30)))
+        self.assertEqual(r["equipment-installed"], rg((2027, 5, 11), (2027, 5, 18)))
+        self.assertEqual(r["av-ordered"], rg((2027, 2, 16), (2027, 2, 23)))
+        self.assertEqual(r["equipment-ordered"], rg((2027, 3, 12), (2027, 4, 17)))
+        self.assertEqual(r["build-complete"], rg((2027, 5, 4), (2027, 5, 25)))
+        self.assertEqual(r["soft-open"], rg((2027, 5, 11), (2027, 6, 1)))
 
     def test_equipment_is_ordered_and_paid_45_to_60_days_before_soft_open(self):
         r = junction()
@@ -106,10 +106,20 @@ class TestResolve(unittest.TestCase):
         sol = ms.solve(DURATIONS, JUNCTION["inputs"])
         self.assertEqual([k.set_aside.name for k in sol.conflicts], ["presale-launch to gm-in-seat"])
 
+    def test_construction_documents_take_28_days_from_the_architect_start(self):
+        r = junction()
+        self.assertEqual(r["architect-start"], (D(2026, 11, 24), D(2026, 11, 24)))
+        self.assertEqual(r["construction-documents-complete"], (D(2026, 12, 22), D(2026, 12, 22)))
+
+    def test_later_architect_start_moves_the_permit_dates_by_the_same_days(self):
+        late = ms.resolve(DURATIONS, dict(JUNCTION["inputs"], **{"architect-start": D(2026, 12, 8)}))
+        self.assertEqual(late["permits-submitted"], (D(2027, 1, 5), D(2027, 1, 5)))
+        self.assertEqual(late["permits-received"], (D(2027, 2, 16), D(2027, 2, 23)))
+
     def test_permit_review_follows_submission(self):
         r = junction()
-        self.assertEqual(r["permits-submitted"], (D(2026, 12, 14), D(2026, 12, 14)))
-        self.assertEqual(r["permits-received"], (D(2027, 1, 29), D(2027, 2, 8)))
+        self.assertEqual(r["permits-submitted"], (D(2026, 12, 22), D(2026, 12, 22)))
+        self.assertEqual(r["permits-received"], (D(2027, 2, 2), D(2027, 2, 9)))
 
     def test_delivery_is_the_planning_assumption(self):
         self.assertEqual(junction()["landlord-delivery"], (D(2027, 2, 8), D(2027, 2, 8)))
@@ -124,12 +134,12 @@ class TestResolve(unittest.TestCase):
         self.assertEqual(early["construction-start"], junction()["construction-start"])
         self.assertEqual(early["soft-open"], junction()["soft-open"])
         late = ms.resolve(DURATIONS, dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 2, 12)}))
-        self.assertEqual(late["construction-start"], (D(2027, 2, 12), D(2027, 2, 18)))
+        self.assertEqual(late["construction-start"], (D(2027, 2, 12), D(2027, 2, 16)))
 
     def test_construction_waits_for_the_later_of_delivery_and_permits(self):
         late = dict(JUNCTION["inputs"], **{"landlord-delivery": D(2027, 3, 1)})
         self.assertEqual(ms.resolve(DURATIONS, late)["construction-start"], (D(2027, 3, 1), D(2027, 3, 1)))
-        self.assertEqual(junction()["construction-start"][0], D(2027, 2, 8))
+        self.assertEqual(junction()["construction-start"][0], D(2027, 2, 9))
 
     def test_template_gaps_from_construction_start(self):
         # Template: construction 11/18, lighting 12/30, install 2/17. Jason Park: CO 12 to 14 weeks in, open a week later.
@@ -143,13 +153,15 @@ class TestResolve(unittest.TestCase):
         self.assertEqual(r["soft-open"][0], D(2027, 2, 17))
 
     def test_rent_starts_150_days_after_the_later_not_before_rule(self):
-        # Delivery 2/8 plus 150 days is 7/8, later than the earliest permits plus 150 days, 6/28.
-        self.assertEqual(junction()["rent-commences"], (D(2027, 7, 8), D(2027, 7, 8)))
+        # Delivery 2/8 plus 150 days is 7/8, later than the earliest permits plus 150 days, 7/2, and the latest permits give 7/9.
+        self.assertEqual(junction()["rent-commences"], (D(2027, 7, 8), D(2027, 7, 9)))
 
     def test_permits_submitted_within_60_days_of_lease(self):
-        inputs = {k: v for k, v in JUNCTION["inputs"].items() if k != "permits-submitted"}
-        # 60 days after the latest lease is 2/27, and no rule points back at the submission to pull it earlier.
-        self.assertEqual(ms.resolve(DURATIONS, inputs)["permits-submitted"], (D(2026, 12, 14), D(2027, 2, 27)))
+        # 60 days after the latest lease is 2/27, so an architect start on 2/1 puts submission at 3/1 and the requirement collides.
+        sol = ms.solve(DURATIONS, dict(JUNCTION["inputs"], **{"architect-start": D(2027, 2, 1)}))
+        self.assertIn("lease-signed to permits-submitted", [k.set_aside.name for k in sol.conflicts])
+        # An architect start on 11/24 leaves the lease requirement intact.
+        self.assertNotIn("lease-signed to permits-submitted", [k.set_aside.name for k in ms.solve(DURATIONS, JUNCTION["inputs"]).conflicts])
 
     def test_site_fixed_submission_leaves_the_lease_range_alone(self):
         # The rule runs from the lease to the submission, so a submission fixed on 12/14 does not narrow the lease.
@@ -159,7 +171,7 @@ class TestResolve(unittest.TestCase):
         r = junction()
         self.assertEqual(r["vip-start"], (D(2026, 10, 23), D(2026, 10, 26)))
         self.assertEqual(r["presale-launch"], (D(2026, 12, 4), D(2026, 12, 21)))
-        self.assertEqual(r["grand-opening"], (D(2027, 6, 21), D(2027, 7, 29)))
+        self.assertEqual(r["grand-opening"], (D(2027, 6, 22), D(2027, 7, 27)))
 
     def test_presale_prerequisites_fall_between_kickoff_and_vip_start(self):
         r = junction()
@@ -507,7 +519,7 @@ class TestPhaseFlags(unittest.TestCase):
         _, r = self.messages()
         rows = ms.phase_rows(DURATIONS, r)
         self.assertEqual([p[0] for p in rows], [p["key"] for p in DURATIONS["phases"]])
-        self.assertEqual(dict((p[0], p[4]) for p in rows)["presale-membership-sales"], (157, 164))
+        self.assertEqual(dict((p[0], p[4]) for p in rows)["presale-membership-sales"], (158, 162))
 
 
 class TestRender(unittest.TestCase):

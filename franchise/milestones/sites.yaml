@@ -15,18 +15,16 @@ sites:
       gm-sourcing: 2026-10-06       # Fibr's clock start, per Regan Hahn on the 10/7 call
       lease-signed: [2026-12-14, 2026-12-29] # first draft received 10/30 plus Anson's 45 to 60 days; Lynnsee's 6-week average falls just before
       landlord-delivery: 2027-02-08 # planning assumption, not a landlord commitment: the latest permit approval, so delivery never delays the build. Replace it when the landlord commits
-      construction-documents-complete: 2026-12-04 # Vision Track completion on 10/14
+      architect-start: 2026-11-24 # the architect pick date, signed before the lease so the landlord has our drawings for its permit; every architect waits for the new DIP and revised space plan, so move it when they arrive
       bid-complete: 2026-12-22 # Vision Track completion on 10/14
-      permits-submitted: 2026-12-14 # Vision Track permitting start on 10/14, after construction documents finish 12/4
     status:
       presale-kickoff: committed
       vip-start: assumed
       lease-signed: estimated
       gm-sourcing: committed
       landlord-delivery: assumed
-      construction-documents-complete: committed
+      architect-start: assumed
       bid-complete: committed
-      permits-submitted: estimated
     outputs:
       timeline_csv: "~/Library/CloudStorage/GoogleDrive-samit.chaudhuri@gmail.com/My Drive/Work/Franchise/ULC-Personal/Development/Opening Timeline/ULC Los Gatos Opening Timeline.csv"
       ramp: "~/Library/CloudStorage/GoogleDrive-samit.chaudhuri@gmail.com/My Drive/Work/Franchise/ULC-Personal/Finance/Funding Plan/ULC Funding Ramp.xlsx"
@@ -39,9 +37,8 @@ sites:
       gm_hard_stop: 2026-12-11
     basis:
       vip-start: Elise Budowanec wrote on 10/21 that the VIP launch date is revisited the week of 10/26 once the site and lease are clearer, so 11/2 is a placeholder that is a date both 5th Element and PRSPR can go live; it replaces the 10/26 date from the 10/9 kickoff
-      construction-documents-complete: Vision Track completion date for construction documents, shown by Jason Park on 10/14
+      architect-start: The pick is due 11/24 and the architect needs the new DIP, expected the week of 11/9, and the revised space plan, so 11/24 is a placeholder until the contract is signed. The contract is signed before the lease, decided 11/3, because the landlord needs our drawings to submit its permit
       bid-complete: Vision Track completion date for the bid, shown by Jason Park on 10/14
-      permits-submitted: Vision Track submits on 12/14 once construction documents finish 12/4, which falls inside the Counter LOI's 60 days after the lease
       landlord-delivery: Our planning assumption is 2/8, the latest date permits can be approved, so that delivery never delays construction. A commitment from the landlord replaces it, and a later date moves the build dates while an earlier one changes nothing; Greg's April 2027 availability from 8/27 is not committed, and Jason Park is asking Anson for the real date
       gm-sourcing: Regan Hahn said on the 10/7 call that the Fibr clock started 10/6, the day Samit signed the agreement, so the first vetted candidates reach Michelle between 10/13 and 10/16
       lease-signed: Anson Switzer's 45 to 60 days from the first draft, which arrived 10/30 and went to the attorney the same day and not about 10/15 as first assumed, and it sits past the top of Lynnsee Starr's range of 2 weeks to 2 months, which averages 6 weeks; any date after 2026-11-09 needs the one-time extension

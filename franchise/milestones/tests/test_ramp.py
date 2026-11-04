@@ -110,7 +110,7 @@ class TestSync(RampCase):
         ramp.sync(self.xlsx, self.moved())
         ws = openpyxl.load_workbook(self.xlsx)[ramp.MILESTONES]
         got = {r[1]: r[3].date() for r in ws.iter_rows(min_row=2, max_col=5, values_only=True) if r[1]}
-        self.assertEqual(got["construction-start"], D(2027, 3, 10))
+        self.assertEqual(got["construction-start"], D(2027, 3, 11))
 
     def test_refuses_while_excel_has_the_file_open(self):
         (self.dir / "~$ramp.xlsx").write_text("")

@@ -107,7 +107,7 @@ class TestBuildRows(unittest.TestCase):
         self.assertIn(("at least 14 days before <<32.1>>", [], "requirement"), r["presale-kit-ordered"])    # [,-14] has no minimum
         self.assertFalse(any(k == "preference" for _, _, k in r["presale-launch"]))
         self.assertFalse(any(k == "preference" for key in ("construction-start", "soft-open") for _, _, k in r[key]))
-        self.assertIn("at least 10 days after <<26.1>>", [t for t, _, _ in r["construction-start"]])
+        self.assertIn("at least 7 days after <<26.1>>", [t for t, _, _ in r["construction-start"]])
         self.assertIn("on or after <<26.2>>", [t for t, _, _ in r["construction-start"]])
         self.assertNotIn("lease-signed", r)
 
@@ -144,10 +144,10 @@ class TestBuildRows(unittest.TestCase):
 
     def test_rules_are_merged_and_sorted(self):
         rows = [{"id": i, "rule": ""} for i in range(1, 17)]
-        rows.append({"id": 17, "rule": "at least 10 days after permits-received; after <<16>>; after <<15>>; at least 10 days after <<3>>; 2 days after <<9>>; 2 days after <<4>>",
+        rows.append({"id": 17, "rule": "at least 7 days after permits-received; after <<16>>; after <<15>>; at least 7 days after <<3>>; 2 days after <<9>>; 2 days after <<4>>",
                      "preference": ""})
         self.assertEqual(tc.renumber(rows)[-1]["rule"],
-                         "after 15, 16; at least 10 days after 3, permits-received; 2 days after 4, 9")
+                         "after 15, 16; at least 7 days after 3, permits-received; 2 days after 4, 9")
 
     def test_duration_is_the_days_from_start_to_end(self):
         tasks = tc.read_tasks(book())
