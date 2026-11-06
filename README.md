@@ -89,6 +89,8 @@ personal-os/
 │   ├── mcp/                # MCP server implementation
 │   │   └── server.py       # Core server with deduplication
 │   └── README.md           # Core system documentation
+├── scripts/                # Helper scripts
+│   └── time_study.py       # Quadrant time study from the daily plan table (see vault/Agent/Workflows/Time Study.md)
 └── setup.sh                # Interactive setup script
 
 ```

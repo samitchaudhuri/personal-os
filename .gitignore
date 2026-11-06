@@ -83,6 +83,7 @@ logs/
 # Testing
 test_*.py
 *.test.py
+!scripts/tests/test_time_study.py
 .pytest_cache/
 .coverage
 
