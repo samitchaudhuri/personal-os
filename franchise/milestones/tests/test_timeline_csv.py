@@ -211,8 +211,8 @@ class TestBuildRows(unittest.TestCase):
         self.assertEqual(tc.site_estimates("junction")[37][0], "digital-partner-selected")
         self.assertEqual(tc.extra_milestones("junction")[37][0][1], "presale-kit-ordered")
         rules = tc.milestone_rules()
-        for key in ("digital-partner-selected", "membership-agreement-finalized"):
-            self.assertIn(("0-17 days before <<38>>", [], "requirement"), rules[key])    # written from vip-start with a negative duration
+        self.assertIn(("at least 5 days before <<38>>", [], "requirement"), rules["digital-partner-selected"])
+        self.assertIn(("on or before <<38>>", [], "requirement"), rules["membership-agreement-finalized"])    # written from vip-start with a negative duration
         refs = {r for text, rows, _ in rules["vip-start"] for r in rows}
         self.assertNotIn("37.1", refs)    # the kit order no longer feeds the VIP start
         deps = tc.load_dependencies()

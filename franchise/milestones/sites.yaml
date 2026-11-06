@@ -11,7 +11,7 @@ sites:
     title: Junction
     inputs:
       presale-kickoff: 2026-10-09      # scheduled by Elise, 11:30 AM PT
-      vip-start: 2026-11-02 # held at 11/2 for now while Elise revisits the launch date with Don and Michelle; change it when she settles it
+      vip-start: 2026-12-28 # plan of record from Elise's 11/5 email, a Monday after the holidays on 5th Element's advice; it may change, so update it here and rerun
       gm-sourcing: 2026-10-06       # Fibr's clock start, per Regan Hahn on the 10/7 call
       lease-signed: [2026-12-14, 2026-12-29] # first draft received 10/30 plus Anson's 45 to 60 days; Lynnsee's 6-week average falls just before
       landlord-delivery: 2027-02-08 # planning assumption, not a landlord commitment: the latest permit approval, so delivery never delays the build. Replace it when the landlord commits
@@ -19,7 +19,7 @@ sites:
       bid-complete: 2026-12-22 # Vision Track completion on 10/14
     status:
       presale-kickoff: committed
-      vip-start: assumed
+      vip-start: committed
       lease-signed: estimated
       gm-sourcing: committed
       landlord-delivery: assumed
@@ -36,7 +36,7 @@ sites:
       opening_extension_fee_per_month: 2500
       gm_hard_stop: 2026-12-11
     basis:
-      vip-start: Elise Budowanec wrote on 10/21 that the VIP launch date is revisited the week of 10/26 once the site and lease are clearer, so 11/2 is a placeholder that is a date both 5th Element and PRSPR can go live; it replaces the 10/26 date from the 10/9 kickoff
+      vip-start: Elise Budowanec emailed on 11/5 that 5th Element recommends starting the VIP campaign after the holidays, on Monday 12/28, and she and Michelle Tomko will slot it in. It replaces the 11/2 placeholder, the 12/24 date from the 10/30 sync and the 12/21 alternative, and it is the plan of record for scheduling and communication until Elise says otherwise
       architect-start: The pick is due 11/24 and the architect needs the new DIP, expected the week of 11/9, and the revised space plan, so 11/24 is a placeholder until the contract is signed. The contract is signed before the lease, decided 11/3, because the landlord needs our drawings to submit its permit
       bid-complete: Vision Track completion date for the bid, shown by Jason Park on 10/14
       landlord-delivery: Our planning assumption is 2/8, the latest date permits can be approved, so that delivery never delays construction. A commitment from the landlord replaces it, and a later date moves the build dates while an earlier one changes nothing; Greg's April 2027 availability from 8/27 is not committed, and Jason Park is asking Anson for the real date

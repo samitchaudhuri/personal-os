@@ -67,13 +67,13 @@ phases:
     basis: Michelle Tomko said on 10/14 that membership sales run 4 to 6 months, which replaces the deck and the playbook's 3 to 5 months. Soft open mostly comes from the build chain, so this phase bounds it from launch and flags a build that falls outside the window
 
 constraints:
-  - {from: presale-kickoff, to: digital-partner-selected, duration_days: [0, 17], kind: requirement}
-  - {from: vip-start, to: digital-partner-selected, duration_days: [-17, 0], kind: requirement}
+  - {from: presale-kickoff, to: digital-partner-selected, duration_days: [0,], kind: requirement}
+  - {from: vip-start, to: digital-partner-selected, duration_days: [,-5], kind: requirement}
   - {from: presale-kickoff, to: presale-kit-ordered, duration_days: [0,], kind: requirement}
   - {from: gm-in-seat, to: presale-kit-ordered, duration_days: [,-14], kind: requirement}
   - {from: presale-launch, to: presale-kit-ordered, duration_days: [,-14], kind: requirement}
-  - {from: presale-kickoff, to: membership-agreement-finalized, duration_days: [0, 17], kind: requirement}
-  - {from: vip-start, to: membership-agreement-finalized, duration_days: [-17, 0], kind: requirement}
+  - {from: presale-kickoff, to: membership-agreement-finalized, duration_days: [0,], kind: requirement}
+  - {from: vip-start, to: membership-agreement-finalized, duration_days: [,0], kind: requirement}
   - {from: gm-sourcing, to: gm-offer-accepted, duration_days: [45, 45], kind: estimate}
   - {from: gm-offer-accepted, to: gm-in-seat, duration_days: [14, 28], kind: estimate}
   - {from: presale-launch, to: gm-in-seat, duration_days: [-21, -21], kind: preference}
@@ -104,7 +104,7 @@ milestones:
     label: Digital partner selected
     gantt_row: 37
     fixable: true
-    basis: Elise Budowanec's 10/9 follow-up asks Samit to pick one of three approved local agencies, PRSPR, 5th Element or JL Marketing, by 10/23 to launch campaigns on 10/26. It has to land between the kickoff and the VIP start
+    basis: Elise Budowanec's 10/9 follow-up asks Samit to pick one of three approved local agencies, PRSPR, 5th Element or JL Marketing, by 10/23 to launch campaigns on 10/26, and the VIP start has since moved to 12/28. The pick has to land after the kickoff and at least 5 days before the VIP start, so the agency can set up the ad accounts before the campaign goes live, and the cap of 17 days after the kickoff was dropped on 11/5 because it assumed a 10/26 start
 
   - key: presale-kit-ordered
     label: Presale marketing kit ordered
@@ -116,7 +116,7 @@ milestones:
     label: Membership agreement finalized
     gantt_row: 19
     fixable: true
-    basis: The membership agreement is final once ULC approves the attorney redline of the California template, so it can be loaded into Kite. Presale cannot sell memberships without it, and it has to land between the kickoff and the VIP start. The 0 to 17 day range from the kickoff is a placeholder from the review-only version of this milestone and still needs a duration that fits the redline and ULC approval
+    basis: The membership agreement is final once ULC approves the attorney redline of the California template, so it can be loaded into Kite. Presale cannot sell memberships without it, and it has to land after the kickoff and on or before the VIP start. The 17-day window around the kickoff assumed a 10/26 start and was dropped on 11/5, when the VIP start moved to 12/28. How long the redline and ULC approval take still needs a duration
 
   - key: lease-signed
     label: Lease signed

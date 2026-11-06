@@ -175,8 +175,9 @@ class TestResolve(unittest.TestCase):
 
     def test_presale_prerequisites_fall_between_kickoff_and_vip_start(self):
         r = junction()
-        for key in ("digital-partner-selected", "membership-agreement-finalized"):
-            self.assertEqual(r[key], (D(2026, 10, 9), D(2026, 10, 26)), key)
+        self.assertEqual(r["membership-agreement-finalized"], (D(2026, 10, 9), D(2026, 10, 26)))
+        # The agency needs 5 days after the pick to set up before the VIP start.
+        self.assertEqual(r["digital-partner-selected"], (D(2026, 10, 9), D(2026, 10, 21)))
 
     def test_the_kit_order_runs_from_kickoff_to_the_latest_the_gm_and_launch_checks_allow(self):
         self.assertEqual(junction()["presale-kit-ordered"], (D(2026, 10, 9), D(2026, 12, 4)))
